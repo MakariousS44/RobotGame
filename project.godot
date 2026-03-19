@@ -11,8 +11,28 @@ config_version=5
 [application]
 
 config/name="move_command"
+run/main_scene="uid://ddheufqb82bcu"
 config/features=PackedStringArray("4.6", "Forward Plus")
+boot_splash/bg_color=Color(0.97055286, 0.75035083, 0.88283765, 1)
+boot_splash/stretch_mode=0
 config/icon="res://icon.svg"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/initial_position_type=0
+window/size/resizable=false
+window/stretch/mode="canvas_items"
+
+[gui]
+
+fonts/dynamic_fonts/use_oversampling=false
+
+[internationalization]
+
+rendering/root_node_layout_direction=1
+rendering/root_node_auto_translate=false
 
 [physics]
 

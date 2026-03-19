@@ -1,0 +1,24 @@
+[gd_scene format=3 uid="uid://djsg204xq54i8"]
+
+[ext_resource type="Script" uid="uid://f2w63y8b8jur" path="res://scripts/worlds/player.gd" id="1_78x7u"]
+[ext_resource type="Texture2D" uid="uid://clu8us6s6fbbl" path="res://icon.svg" id="2_jj66b"]
+
+[node name="GameTest" type="Node2D" unique_id=918532889]
+
+[node name="ColorRect" type="ColorRect" parent="." unique_id=2052619125]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+color = Color(0.36455786, 0.5902611, 0.16321903, 1)
+
+[node name="Player" type="Node2D" parent="." unique_id=1807080076]
+script = ExtResource("1_78x7u")
+
+[node name="Sprite2D" type="Sprite2D" parent="Player" unique_id=853959161]
+texture = ExtResource("2_jj66b")
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=1239584116]
