@@ -9,7 +9,6 @@
 3. [Getting Started](#getting-started)
 4. [How to Play](#how-to-play)
 5. [Available Commands](#available-commands)
-6. [Contributing](#contributing)
 
 ---
 
