@@ -1,4 +1,4 @@
-## PythonCompiler.gd
+## python_compiler.gd
 ## Wraps, executes, and captures output from player-written Python code.
 ## Uses the system Python interpreter (works on Linux and Windows).
 ##
