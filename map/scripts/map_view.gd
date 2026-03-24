@@ -1,5 +1,7 @@
 extends Node2D
 
+# === visual config ===
+# tweakables so we're not hardcoding mystery numbers all over the place
 @export var tile_width: int = 64
 @export var tile_height: int = 32
 
@@ -7,10 +9,11 @@ extends Node2D
 @export var floor_color_alt: Color = Color("769862")
 @export var grid_color: Color = Color("d0d5c8")
 @export var wall_color: Color = Color("f5ead7")
-@export var player_color: Color = Color("7a4df3")
-@export var player_shadow_color: Color = Color(0, 0, 0, 0.18)
 @export var board_shadow_color: Color = Color(0, 0, 0, 0.14)
 
+
+# === scene references ===
+# all the visual level layers live under WorldRoot
 @onready var world_root: Node2D = $WorldRoot
 @onready var floor_node: Node2D = $WorldRoot/Floor
 @onready var grid_node: Node2D = $WorldRoot/Grid
@@ -19,26 +22,37 @@ extends Node2D
 @onready var player: Node2D = $WorldRoot/Player
 @onready var camera: Camera2D = $Camera2D
 
-var world_data: Dictionary = {}
+
+# === loaded level state ===
+# this is already-usable level data, not raw JSON
+var level_data: Dictionary = {}
 var rows: int = 0
 var cols: int = 0
 
 
+# === scene lifecycle ===
+# runs when this scene is instantiated into the tree
+# this scene owns the camera, so it configures it here
 func _ready() -> void:
 	camera.enabled = true
 	camera.make_current()
 
 
-func load_world_data(data: Dictionary) -> void:
-	world_data = data
+# === main entry point ===
+# outside code gives this scene a level definition dictionary
+# this file then builds the full playable board from it
+func build_level(data: Dictionary) -> void:
+	level_data = data
 	rows = data.get("rows", 10)
 	cols = data.get("cols", 10)
 
+	# wipe old visuals so we don't stack levels on top of each other
 	_clear_children(floor_node)
 	_clear_children(grid_node)
 	_clear_children(walls_node)
 	_clear_children(objects_node)
 
+	# enforce consistent draw order
 	floor_node.z_index = 0
 	grid_node.z_index = 1
 	walls_node.z_index = 2
@@ -53,6 +67,8 @@ func load_world_data(data: Dictionary) -> void:
 	_center_camera()
 
 
+# === board shadow ===
+# purely visual polish so the board doesn't feel like it’s floating in void
 func _build_board_shadow() -> void:
 	var shadow := Polygon2D.new()
 
@@ -73,10 +89,13 @@ func _build_board_shadow() -> void:
 	floor_node.add_child(shadow)
 
 
+# === floor tiles ===
+# builds the base surface of the level using isometric diamonds
 func _build_floor() -> void:
 	for gx in range(1, cols + 1):
 		for gy in range(1, rows + 1):
 			var tile := Polygon2D.new()
+
 			tile.polygon = PackedVector2Array([
 				Vector2(0, -tile_height / 2.0),
 				Vector2(tile_width / 2.0, 0),
@@ -84,15 +103,15 @@ func _build_floor() -> void:
 				Vector2(-tile_width / 2.0, 0)
 			])
 
-			if (gx + gy) % 2 == 0:
-				tile.color = floor_color
-			else:
-				tile.color = floor_color_alt
-
+			# alternating colors so the board doesn't look dead
+			tile.color = floor_color if (gx + gy) % 2 == 0 else floor_color_alt
 			tile.position = _cell_center(gx, gy)
+
 			floor_node.add_child(tile)
 
 
+# === grid overlay ===
+# visual helper for readability and debugging (not gameplay logic)
 func _build_grid() -> void:
 	for gx in range(1, cols + 1):
 		for gy in range(1, rows + 1):
@@ -115,67 +134,41 @@ func _build_grid() -> void:
 			grid_node.add_child(diamond)
 
 
+# === player placement ===
+# decides WHERE the player goes
+# the player script decides how it behaves and looks
 func _place_player() -> void:
-	if not world_data.has("robots"):
+	if not level_data.has("robots"):
 		return
 
-	var robots = world_data["robots"]
+	var robots = level_data["robots"]
 	if robots.is_empty():
 		return
 
 	var robot = robots[0]
 	var gx: int = robot.get("x", 1)
 	var gy: int = robot.get("y", 1)
+	var world_pos := _cell_center(gx, gy)
 
-	var world_pos = _cell_center(gx, gy)
-
-	if player.has_method("set_grid_position"):
-		player.set_grid_position(gx, gy, world_pos)
-	else:
-		player.position = world_pos
-
-	for child in player.get_children():
-		child.queue_free()
-
-	var shadow := Polygon2D.new()
-	shadow.name = "Shadow"
-	shadow.polygon = PackedVector2Array([
-		Vector2(0, -6),
-		Vector2(12, 0),
-		Vector2(0, 6),
-		Vector2(-12, 0)
-	])
-	shadow.color = player_shadow_color
-	shadow.position = Vector2(0, 12)
-	shadow.z_index = 99
-	player.add_child(shadow)
-
-	var marker := Polygon2D.new()
-	marker.name = "Marker"
-	marker.polygon = PackedVector2Array([
-		Vector2(0, -20),
-		Vector2(16, -4),
-		Vector2(10, 16),
-		Vector2(-10, 16),
-		Vector2(-16, -4)
-	])
-	marker.color = player_color
-	marker.z_index = 100
-	player.add_child(marker)
+	# pass this level_scene into the player so it can query bounds and positions cleanly
+	if player.has_method("initialize_from_level"):
+		player.initialize_from_level(robot, world_pos)
 
 
+# === walls ===
+# reads wall data and draws directional wall segments
 func _build_walls() -> void:
-	if not world_data.has("walls"):
+	if not level_data.has("walls"):
 		return
 
-	for key in world_data["walls"].keys():
+	for key in level_data["walls"].keys():
 		var parts: PackedStringArray = key.split(",")
 		if parts.size() != 2:
 			continue
 
 		var gx := int(parts[0])
 		var gy := int(parts[1])
-		var directions = world_data["walls"][key]
+		var directions = level_data["walls"][key]
 
 		for dir in directions:
 			_add_wall_segment(gx, gy, dir)
@@ -212,6 +205,8 @@ func _add_wall_segment(gx: int, gy: int, dir: String) -> void:
 	walls_node.add_child(wall)
 
 
+# === camera framing ===
+# centers and zooms the camera so the entire board fits on screen
 func _center_camera() -> void:
 	camera.enabled = true
 	camera.make_current()
@@ -246,6 +241,8 @@ func _center_camera() -> void:
 	camera.zoom = Vector2(fit_zoom, fit_zoom)
 
 
+# === coordinate system ===
+# converts grid coordinates into isometric world positions
 func _cell_center(gx: int, gy: int) -> Vector2:
 	var grid_x := float(cols - gx)
 	var grid_y := float(rows - gy)
@@ -259,13 +256,20 @@ func _cell_center(gx: int, gy: int) -> Vector2:
 	return Vector2(iso_x + offset_x, iso_y + offset_y)
 
 
+# === helpers ===
+# removes all children from a node (used for rebuilding levels)
 func _clear_children(node: Node) -> void:
 	for child in node.get_children():
 		child.queue_free()
 
 
+# === public helpers ===
+# these are used by runtime systems like the player
+
+# converts grid coordinates into world space position
 func grid_to_world_position(gx: int, gy: int) -> Vector2:
 	return _cell_center(gx, gy)
 
+# simple bounds check so the player doesn't walk off the map like a clown
 func is_in_bounds(gx: int, gy: int) -> bool:
 	return gx >= 1 and gx <= cols and gy >= 1 and gy <= rows

@@ -9,8 +9,6 @@
 ##   print(result.stderr)   # error message if any
 ##   print(result.success)  # bool
 
-class_name python_compiler
-
 
 class RunResult:
 	var success:   bool   ## True if the code exited with code 0 and no errors
@@ -107,7 +105,7 @@ try:
     _compiled = compile(_player_source, '<player_code>', 'exec')
     exec(_compiled)
 except SyntaxError as _e:
-    sys.stderr.write("SyntaxError: {msg} (line {line})\\n".format(
+	sys.stderr.write("SyntaxError: {msg} (line {line})\\n".format(
         msg  = _e.msg,
         line = _e.lineno
     ))
@@ -116,13 +114,13 @@ except Exception as _e:
     player_frames = [f for f in tb if f.filename == '<player_code>']
     if player_frames:
         frame = player_frames[-1]
-        sys.stderr.write("{error}: {msg} (line {line})\\n".format(
+		sys.stderr.write("{error}: {msg} (line {line})\\n".format(
             error = type(_e).__name__,
             msg   = str(_e),
             line  = frame.lineno
         ))
     else:
-        sys.stderr.write("{error}: {msg}\\n".format(
+		sys.stderr.write("{error}: {msg}\\n".format(
             error = type(_e).__name__,
             msg   = str(_e)
         ))

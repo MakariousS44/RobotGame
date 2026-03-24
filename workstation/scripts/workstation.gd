@@ -1,6 +1,7 @@
 extends Control
 
-# UI element references
+# === UI references ===
+# all the workspace pieces live here: editor, output, controls, and level viewport
 @onready var editor: CodeEdit = $RootMargin/MainColumn/WorkspaceSplit/EditorOutputSplit/EditorSection/EditorPanel/EditorMargin/Editor
 @onready var game_view: SubViewportContainer = $RootMargin/MainColumn/WorkspaceSplit/GameViewPanel/GameView
 @onready var game_subviewport: SubViewport = $RootMargin/MainColumn/WorkspaceSplit/GameViewPanel/GameView/SubViewport
@@ -12,30 +13,33 @@ extends Control
 @onready var reset_button: Button = $RootMargin/MainColumn/TopBarPanel/TopBar/LeftButtons/ResetButton
 @onready var language_selector: OptionButton = $RootMargin/MainColumn/TopBarPanel/TopBar/RightButtons/LanguageSelector
 
-# Pipeline components
-var validator = preload("res://scripts/pipeline/student_validator.gd").new()
-var generator = preload("res://scripts/pipeline/source_generator.gd").new()
-var compiler = preload("res://scripts/pipeline/compiler_driver.gd").new()
-var translator = preload("res://scripts/pipeline/command_translator.gd").new()
-var executor = preload("res://scripts/pipeline/command_executor.gd").new()
-var py_pipeline = preload("res://scripts/pipeline/python_pipeline.gd").new()
+# === execution components ===
+# these turn student code into command output the game can actually use
+var validator = preload("res://execution/cpp/cpp_validator.gd").new()
+var generator = preload("res://execution/cpp/cpp_generator.gd").new()
+var compiler = preload("res://execution/cpp/cpp_driver.gd").new()
+var translator = preload("res://execution/shared/command_translator.gd").new()
+var executor = preload("res://execution/shared/command_executor.gd").new()
+var py_pipeline = preload("res://execution/python/python_pipeline.gd").new()
 
-# Language state
+# === language state ===
 enum Language { CPP, PYTHON }
 var current_language: Language = Language.CPP
 
-# World loading
-var world_loader = preload("res://scripts/worlds/world_loader.gd").new()
+# === level bootstrap ===
+# this screen now loads the level definition and instantiates the playable level scene directly
+var level_definition = preload("res://map/scripts/map_loader.gd").new()
+var level_scene_resource = preload("res://map/scenes/map_view.tscn")
 
-# Game scene
-var game_test_scene = preload("res://scenes/GameTest.tscn")
+# cached runtime refs so this screen can hand commands to the live player
 var game_instance: Node = null
 var player_node: Node = null
 
-# Step mode state
+# === step mode state ===
 var step_mode: bool = false
 var step_queue: Array = []
 var compiled_ok: bool = false
+
 
 func _ready() -> void:
 	_set_status("Ready", "")
@@ -52,29 +56,39 @@ func _ready() -> void:
 	reset_button.pressed.connect(_on_reset_button_pressed)
 
 	await get_tree().process_frame
-	_load_game_test_scene()
+	_load_level_scene()
 
-func _load_game_test_scene() -> void:
+
+# === level loading ===
+# creates the playable level scene, loads the level definition, and asks the scene to build itself
+func _load_level_scene() -> void:
+	# clear out any existing level scene from the viewport
 	for child in game_subviewport.get_children():
 		child.queue_free()
 
-	game_instance = game_test_scene.instantiate()
+	# create and attach the playable level scene
+	game_instance = level_scene_resource.instantiate()
 	game_subviewport.add_child(game_instance)
 
+	# grab the player node so runtime systems can control it later
 	if not game_instance.has_node("WorldRoot/Player"):
-		push_error("GameTest scene is missing node path: WorldRoot/Player")
+		push_error("Level scene is missing node path: WorldRoot/Player")
 		return
 
 	player_node = game_instance.get_node("WorldRoot/Player")
 
-	var raw: Dictionary = world_loader.load_world("res://scripts/worlds/levels/test.json")
+	# load the level definition from disk
+	var raw: Dictionary = level_definition.load(CampaignLevels.TEST_LEVEL)
 	if not raw.ok:
-		push_error("World load failed: %s" % raw.error)
+		push_error("Level load failed: %s" % raw.error)
 		return
 
-	if game_instance.has_method("load_world_data"):
-		game_instance.load_world_data(raw.world)
+	# hand the definition to the level scene so it can build itself
+	if game_instance.has_method("build_level"):
+		game_instance.build_level(raw.definition)
 
+
+# === editor setup ===
 func _setup_editor() -> void:
 	editor.highlight_current_line = true
 	editor.draw_control_chars = false
@@ -82,12 +96,15 @@ func _setup_editor() -> void:
 	editor.indent_use_spaces = true
 	editor.indent_size = 4
 
+
+# === language selector ===
 func _setup_language_selector() -> void:
 	language_selector.add_item("C++")
 	language_selector.add_item("Python")
 	language_selector.select(0)
 	language_selector.item_selected.connect(_on_language_changed)
-	
+
+
 func _on_language_changed(index: int) -> void:
 	current_language = Language.CPP if index == 0 else Language.PYTHON
 	step_mode = false
@@ -103,9 +120,9 @@ func _on_language_changed(index: int) -> void:
 		editor.text = "move()\n"
 		_setup_python_highlighting()
 		_set_status("Ready", "")
-		
 
-# Syntax Highlighters
+
+# === syntax highlighting ===
 
 func _setup_syntax_highlighting() -> void:
 	var highlighter := CodeHighlighter.new()
@@ -135,7 +152,8 @@ func _setup_syntax_highlighting() -> void:
 	highlighter.add_color_region("/*", "*/", Color(0.50, 0.50, 0.50), false)
 
 	editor.syntax_highlighter = highlighter
-	
+
+
 func _setup_python_highlighting() -> void:
 	var highlighter := CodeHighlighter.new()
 
@@ -164,15 +182,16 @@ func _setup_python_highlighting() -> void:
 
 	editor.syntax_highlighter = highlighter
 
-# --- Button handlers ---
+
+# === button handlers ===
 
 func _on_validate_button_pressed() -> void:
 	_set_status("Validating...", "")
 	output_box.clear()
 	log_header("validation")
 	await get_tree().process_frame
-	
-	# Python
+
+	# Python validation path
 	if current_language == Language.PYTHON:
 		var validation = py_pipeline.validate(editor.text)
 		if not validation.ok:
@@ -180,12 +199,13 @@ func _on_validate_button_pressed() -> void:
 				log_error("line %d: %s" % [err.line, err.message])
 			_set_status("Validation failed", "error")
 			return
-	compiled_ok = true
-	log_success("no errors found — ready to run")
-	_set_status("Ready to run", "ok")
-	return
-	
-	# C++
+
+		compiled_ok = true
+		log_success("no errors found — ready to run")
+		_set_status("Ready to run", "ok")
+		return
+
+	# C++ validation path
 	var validation: Dictionary = validator.validate(editor.text)
 	if not validation.ok:
 		for err in validation.errors:
@@ -207,17 +227,20 @@ func _on_validate_button_pressed() -> void:
 	log_success("no errors found — ready to run")
 	_set_status("Ready to run", "ok")
 
+
 func _on_run_button_pressed() -> void:
 	step_mode = false
 	_run_pipeline(false)
 
+
 func _on_step_button_pressed() -> void:
 	if step_mode and step_queue.size() > 0:
-		# Execute one command at a time
+		# execute one command at a time
 		var next = step_queue.slice(0, 1)
 		step_queue = step_queue.slice(1)
 		executor.execute(next, player_node)
 		log_line("▶ step: %s" % next[0].get("type", "?"))
+
 		if step_queue.is_empty():
 			_set_status("Done", "ok")
 			step_mode = false
@@ -225,9 +248,10 @@ func _on_step_button_pressed() -> void:
 			_set_status("Step mode — %d left" % step_queue.size(), "")
 		return
 
-	# First press: compile and load queue
+	# first press compiles/runs and fills the queue
 	step_mode = true
 	_run_pipeline(true)
+
 
 func _on_reset_button_pressed() -> void:
 	step_mode = false
@@ -235,11 +259,12 @@ func _on_reset_button_pressed() -> void:
 	compiled_ok = false
 	output_box.clear()
 	log_header("reset")
-	log_line("World reloaded.")
+	log_line("Level reloaded.")
 	_set_status("Ready", "")
-	_load_game_test_scene()
+	_load_level_scene()
 
-# --- Pipeline ---
+
+# === pipeline execution ===
 
 func _run_pipeline(step_only: bool) -> void:
 	_set_status("Running..." if not step_only else "Compiling...", "")
@@ -247,7 +272,7 @@ func _run_pipeline(step_only: bool) -> void:
 	log_header("run" if not step_only else "step mode")
 	await get_tree().process_frame
 
-	# Python
+	# Python path
 	if current_language == Language.PYTHON:
 		var validation = py_pipeline.validate(editor.text)
 		if not validation.ok:
@@ -267,7 +292,7 @@ func _run_pipeline(step_only: bool) -> void:
 		_finish_pipeline(run_result.output, step_only)
 		return
 
-	# C++
+	# C++ path
 	var validation: Dictionary = validator.validate(editor.text)
 	if not validation.ok:
 		for err in validation.errors:
@@ -294,7 +319,7 @@ func _run_pipeline(step_only: bool) -> void:
 		return
 
 	_finish_pipeline(run_result.output, step_only)
-	
+
 
 func _finish_pipeline(raw_output: String, step_only: bool) -> void:
 	var result: Dictionary = translator.translate_runtime_output(raw_output)
@@ -322,7 +347,8 @@ func _finish_pipeline(raw_output: String, step_only: bool) -> void:
 		executor.execute(commands, player_node)
 		_set_status("Done", "ok")
 
-# --- Status helper ---
+
+# === status helper ===
 
 func _set_status(text: String, state: String) -> void:
 	status_label.text = text
@@ -334,19 +360,24 @@ func _set_status(text: String, state: String) -> void:
 		_:
 			status_label.add_theme_color_override("font_color", Color(0.72, 0.76, 0.81))
 
-# --- Logging ---
+
+# === logging ===
 
 func log_line(text: String) -> void:
 	output_box.append_text(text + "\n")
 
+
 func log_header(title: String) -> void:
 	output_box.append_text("[color=#5b8dd9]── %s ──[/color]\n" % title.to_upper())
+
 
 func log_success(text: String) -> void:
 	output_box.append_text("[color=#78d897]✓[/color]  %s\n" % text)
 
+
 func log_warning(text: String) -> void:
 	output_box.append_text("[color=#e5b567]⚠[/color]  %s\n" % text)
+
 
 func log_error(text: String) -> void:
 	output_box.append_text("[color=#e17777]✗[/color]  %s\n" % text)

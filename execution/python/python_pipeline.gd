@@ -1,7 +1,7 @@
 extends RefCounted
 
-var _validator = preload("res://scripts/pipeline/python_validator.gd").new()
-var _compiler  = preload("res://scripts/pipeline/python_compiler.gd").new()
+var _compiler = preload("res://execution/python/python_compiler.gd").new()
+var _validator  = preload("res://execution/python/python_validator.gd").new()
 
 # Python API injected into the student's environment.
 const ROBOT_API := """
