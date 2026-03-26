@@ -9,6 +9,12 @@ var command_queue: Array = []
 var is_executing: bool = false
 
 
+func stop() -> void:
+	# Hard-stop any pending execution sequence.
+	command_queue.clear()
+	is_executing = false
+
+
 func execute(commands: Array, player_node: Node) -> void:
 	# Entry point for executing a new set of commands.
 	if player_node == null:
@@ -55,6 +61,9 @@ func _execute_next(player_node: Node) -> void:
 
 	# Use the player's own tree (inside SubViewport) for the timer.
 	await player_node.get_tree().create_timer(0.5).timeout
+
+	if not is_executing:
+		return
 
 	# Continue processing remaining commands.
 	_execute_next(player_node)
