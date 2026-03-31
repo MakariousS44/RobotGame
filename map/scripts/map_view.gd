@@ -1,5 +1,8 @@
 extends Node2D
 
+signal level_complete
+
+
 # === visual config ===
 # tweakables so we're not hardcoding mystery numbers all over the place
 @export var tile_width: int = 64
@@ -15,6 +18,8 @@ extends Node2D
 @export var floor_use_checker_alt: bool = true
 @export var floor_use_json_tiles: bool = true
 @export var floor_json_marked_atlas: Vector2i = Vector2i(3, 7)
+@export var floor_goal_atlas: Vector2i = Vector2i(2, 7)
+@export var floor_goal_color: Color = Color(0.95, 0.80, 0.20, 1)
 @export var floor_bottom_offset: float = 0.0
 
 @export var wall_texture: Texture2D = preload("res://assets/tilesheets/walls.png")
@@ -56,6 +61,7 @@ var level_data: Dictionary = {}
 var rows: int = 0
 var cols: int = 0
 var wall_cells: Dictionary = {}
+var goal_cells: Dictionary = {}
 
 
 # === scene lifecycle ===
@@ -80,6 +86,8 @@ func build_level(data: Dictionary) -> void:
 	_clear_children(walls_node)
 	_clear_children(objects_node)
 	wall_cells.clear()
+	goal_cells.clear()
+	_build_goal_cells()
 
 	# enforce consistent draw order
 	floor_node.z_index = 0
@@ -129,6 +137,24 @@ func _build_floor() -> void:
 	_build_floor_legacy()
 
 
+func _build_goal_cells() -> void:
+	if not level_data.has("goal"):
+		return
+	var goal = level_data["goal"]
+	if goal.has("possible_final_positions"):
+		for pos in goal["possible_final_positions"]:
+			if typeof(pos) == TYPE_ARRAY and pos.size() >= 2:
+				goal_cells["%d,%d" % [int(pos[0]), int(pos[1])]] = true
+	if goal.has("position"):
+		var pos = goal["position"]
+		if typeof(pos) == TYPE_DICTIONARY:
+			goal_cells["%d,%d" % [int(pos.get("x", -1)), int(pos.get("y", -1))]] = true
+
+
+func _is_goal_tile(gx: int, gy: int) -> bool:
+	return goal_cells.has("%d,%d" % [gx, gy])
+
+
 func _build_floor_tiles() -> void:
 	var scale_x := float(tile_width) / float(floor_tile_pixel_size.x)
 	var scale_y := float(tile_height) / float(floor_tile_pixel_size.y)
@@ -137,7 +163,11 @@ func _build_floor_tiles() -> void:
 		for gy in range(1, rows + 1):
 			var atlas := floor_primary_atlas
 
-			if floor_use_json_tiles and _is_json_marked_tile(gx, gy):
+			if _is_goal_tile(gx, gy):
+				# render goal tile with a color overlay instead of atlas swap
+				_build_goal_tile_visual(gx, gy)
+				continue
+			elif floor_use_json_tiles and _is_json_marked_tile(gx, gy):
 				atlas = floor_json_marked_atlas
 			elif floor_use_checker_alt and (gx + gy) % 2 != 0:
 				atlas = floor_alt_atlas
@@ -155,6 +185,38 @@ func _build_floor_tiles() -> void:
 			sprite.position = _cell_center(gx, gy) + Vector2(0, floor_bottom_offset)
 
 			floor_node.add_child(sprite)
+
+
+func _build_goal_tile_visual(gx: int, gy: int) -> void:
+	var scale_x := float(tile_width) / float(floor_tile_pixel_size.x)
+	var scale_y := float(tile_height) / float(floor_tile_pixel_size.y)
+
+	# Base tile using primary atlas
+	var sprite := Sprite2D.new()
+	sprite.texture = floor_texture
+	sprite.region_enabled = true
+	sprite.region_rect = Rect2(
+		Vector2(floor_primary_atlas.x * floor_tile_pixel_size.x, floor_primary_atlas.y * floor_tile_pixel_size.y),
+		Vector2(floor_tile_pixel_size.x, floor_tile_pixel_size.y)
+	)
+	sprite.centered = true
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	sprite.scale = Vector2(scale_x, scale_y)
+	sprite.position = _cell_center(gx, gy) + Vector2(0, floor_bottom_offset)
+	floor_node.add_child(sprite)
+
+	# Yellow color overlay on top
+	var overlay := Polygon2D.new()
+	overlay.polygon = PackedVector2Array([
+		Vector2(0, -tile_height / 2.0),
+		Vector2(tile_width / 2.0, 0),
+		Vector2(0, tile_height / 2.0),
+		Vector2(-tile_width / 2.0, 0)
+	])
+	overlay.color = floor_goal_color
+	overlay.position = _cell_center(gx, gy) + Vector2(0, floor_bottom_offset)
+	overlay.z_index = 1
+	floor_node.add_child(overlay)
 
 
 func _is_json_marked_tile(gx: int, gy: int) -> bool:
@@ -522,3 +584,23 @@ func _cell_has_wall_edge(gx: int, gy: int, dir: String) -> bool:
 			return true
 
 	return false
+
+# === win condition ===
+func check_win_condition(gx: int, gy: int) -> void:
+	if not level_data.has("goal"):
+		return
+
+	var goal = level_data["goal"]
+
+	if goal.has("possible_final_positions"):
+		for pos in goal["possible_final_positions"]:
+			if typeof(pos) == TYPE_ARRAY and pos.size() >= 2:
+				if int(pos[0]) == gx and int(pos[1]) == gy:
+					level_complete.emit()
+					return
+
+	if goal.has("position"):
+		var pos = goal["position"]
+		if typeof(pos) == TYPE_DICTIONARY:
+			if int(pos.get("x", -1)) == gx and int(pos.get("y", -1)) == gy:
+				level_complete.emit()

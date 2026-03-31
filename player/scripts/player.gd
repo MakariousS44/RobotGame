@@ -283,6 +283,9 @@ func move_forward() -> void:
 		var tween = create_tween()
 		tween.tween_property(self, "position", target_pos, move_duration)
 
+	if world.has_method("check_win_condition"):
+		world.check_win_condition(grid_x, grid_y)
+
 
 func _trigger_lose(reason: String) -> void:
 	if _has_lost:
