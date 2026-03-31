@@ -11,6 +11,16 @@ extends Control
 @onready var reset_button: Button = $RootMargin/MainColumn/TopBarPanel/TopBar/LeftButtons/ResetButton
 @onready var language_selector: OptionButton = $RootMargin/MainColumn/TopBarPanel/TopBar/RightButtons/LanguageSelector
 
+# === popups ===
+@onready var lose_overlay: Control = $LoseOverlay
+@onready var lose_message: Label = $LoseOverlay/LoseCard/LoseContent/LoseMessage
+@onready var lose_retry_button: Button = $LoseOverlay/LoseCard/LoseContent/LoseButtons/LoseRetryButton
+@onready var win_overlay: Control = $WinOverlay
+@onready var win_retry_button: Button = $WinOverlay/WinCard/WinContent/WinButtons/WinRetryButton
+@onready var win_next_button: Button = $WinOverlay/WinCard/WinContent/WinButtons/WinNextButton
+@onready var lose_menu_button: Button = $LoseOverlay/LoseCard/LoseContent/LoseButtons/LoseMenuButton
+@onready var win_menu_button: Button = $WinOverlay/WinCard/WinContent/WinButtons/WinMenuButton
+
 # === execution components ===
 # these turn student code into command output the game can actually use
 const Paths = preload("res://execution/shared/paths.gd")
@@ -58,6 +68,11 @@ func _ready() -> void:
 	step_button.pressed.connect(_on_step_button_pressed)
 	reset_button.pressed.connect(_on_reset_button_pressed)
 	executor.execution_finished.connect(_on_execution_finished)
+	lose_retry_button.pressed.connect(_on_lose_retry)
+	win_retry_button.pressed.connect(_on_win_retry)
+	win_next_button.pressed.connect(_on_win_next)
+	lose_menu_button.pressed.connect(_on_go_to_menu)
+	win_menu_button.pressed.connect(_on_go_to_menu)
 
 	await get_tree().process_frame
 	_load_level_scene()
@@ -94,6 +109,8 @@ func _load_level_scene() -> void:
 	player_node = game_instance.get_node("WorldRoot/Player")
 	if player_node.has_signal("lose_triggered"):
 		player_node.lose_triggered.connect(_on_player_lose)
+	if game_instance.has_signal("level_complete"):
+		game_instance.level_complete.connect(_on_level_complete)
 
 	# load the level definition from disk
 	var raw: Dictionary = level_definition.load(CampaignLevels.TEST_LEVEL)
@@ -250,24 +267,90 @@ func _on_reset_button_pressed() -> void:
 	_load_level_scene()
 
 
+# === funny lose messages ===
+const LOSE_MESSAGES := [
+	"The robot has left the chat.",
+	"Have you tried turning it off and on again?",
+	"Your robot took an unscheduled vacation.",
+	"The robot says: I quit.",
+	"404: Success not found.",
+	"Instructions unclear. Robot now in another dimension.",
+	"Your robot walked into a wall. Impressive dedication.",
+	"The robot has filed a complaint with HR.",
+	"Maybe try fewer walls next time?",
+	"Your robot called in sick.",
+	"The matrix has rejected your code.",
+	"Skill issue detected. Try again.",
+	"Your robot tripped over its own code.",
+	"The robot is on strike. Have you tried negotiating?",
+	"Oops! Your robot is now a wall decoration.",
+]
+
+func _set_controls_disabled(disabled: bool) -> void:
+	run_button.disabled = disabled
+	step_button.disabled = disabled
+	reset_button.disabled = disabled
+	language_selector.disabled = disabled
+	editor.editable = not disabled
+
+
+func _get_funny_lose_message() -> String:
+	return LOSE_MESSAGES[randi() % LOSE_MESSAGES.size()]
+
+
 func _on_player_lose(reason: String) -> void:
 	if _is_handling_lose:
 		return
 	_is_handling_lose = true
 
+	executor.cancel()
 	step_mode = false
 	step_queue = []
-	if executor.has_method("stop"):
-		executor.stop()
 
 	log_header("lose")
 	log_error(reason)
-	_set_status("You lose", "error")
+	_set_status("You lost", "error")
 
-	await get_tree().create_timer(0.8).timeout
-	_load_level_scene()
-	_set_status("Ready", "")
+	lose_message.text = _get_funny_lose_message()
+	lose_overlay.visible = true
+	_set_controls_disabled(true)
+
+
+func _on_level_complete() -> void:
+	executor.cancel()
+	step_mode = false
+	step_queue = []
+
+	log_header("level complete")
+	log_success("Your robot reached the goal!")
+	_set_status("Level Complete!", "ok")
+
+	win_overlay.visible = true
+	_set_controls_disabled(true)
+
+
+func _on_lose_retry() -> void:
+	lose_overlay.visible = false
 	_is_handling_lose = false
+	_set_controls_disabled(false)
+	_on_reset_button_pressed()
+
+
+func _on_win_retry() -> void:
+	win_overlay.visible = false
+	_set_controls_disabled(false)
+	_on_reset_button_pressed()
+
+
+func _on_win_next() -> void:
+	win_overlay.visible = false
+	_set_controls_disabled(false)
+	log_header("info")
+	log_line("Next level coming soon!")
+
+
+func _on_go_to_menu() -> void:
+	get_tree().change_scene_to_file("res://main_menu/scenes/main_menu.tscn")
 
 
 # === pipeline execution ===

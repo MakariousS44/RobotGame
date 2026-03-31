@@ -63,13 +63,13 @@
 	"possible_final_positions": [
 	  [
 		2,
-		14
+		4
 	  ]
 	],
 	"position": {
 	  "image": "house",
 	  "x": 2,
-	  "y": 14
+	  "y": 4
 	}
   },
   "tiles": {
