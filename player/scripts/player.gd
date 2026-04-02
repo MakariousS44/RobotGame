@@ -8,7 +8,7 @@ signal lose_triggered(reason: String)
 @export var use_sprite_visual: bool = true
 @export var player_texture: Texture2D = preload("res://assets/textures/kenney_isometric-miniature-prototype/Characters/Human/Human_0_Idle0.png")
 @export var sprite_scale: Vector2 = Vector2(0.45, 0.45)
-@export var sprite_offset: Vector2 = Vector2(0, -8)
+@export var sprite_offset: Vector2 = Vector2(2, 4)
 @export var rotate_sprite_with_facing: bool = false
 @export var snap_sprite_to_pixels: bool = true
 @export var auto_trim_player_region: bool = true
@@ -91,7 +91,10 @@ func _rebuild_visuals() -> void:
 		if auto_trim_player_region:
 			_apply_trimmed_region(sprite)
 		sprite.scale = sprite_scale
-		sprite.position = sprite_offset.round() if snap_sprite_to_pixels else sprite_offset
+		var tex_height: float = sprite.region_rect.size.y if sprite.region_enabled else float(sprite.texture.get_height())
+		var scaled_half_h := tex_height * sprite.scale.y * 0.5
+		var base_pos := Vector2(0.0, -scaled_half_h)
+		sprite.position = (base_pos + sprite_offset).round() if snap_sprite_to_pixels else (base_pos + sprite_offset)
 		sprite.z_index = 100
 		add_child(sprite)
 

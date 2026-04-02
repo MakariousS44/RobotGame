@@ -29,48 +29,17 @@
   "rows": 14,
   "cols": 14,
   "walls": {
-	"6,9": [
-      "north"
-	],
-	"3,9": [
-      "north"
-	],
-	"4,11": [
-      "north"
-	],
-	"5,7": [
-      "east"
-	],
-	"2,7": [
-      "east"
-	],
-	"6,5": [
-      "east"
+	"2,3": [
+      "south"
 	]
-  },
-  "objects": {
-	"5,5": {
-	  "apple": 1
-	},
-	"4,12": {
-	  "strawberry": 1
-	},
-	"4,7": {
-	  "square": 1
-	}
   },
   "goal": {
 	"possible_final_positions": [
 	  [
-		2,
-		4
+		1,
+		7
 	  ]
-	],
-	"position": {
-	  "image": "house",
-	  "x": 2,
-	  "y": 4
-	}
+	]
   },
   "tiles": {
 	"1,1": [

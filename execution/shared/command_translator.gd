@@ -36,7 +36,7 @@ func translate_runtime_output(raw_output: String) -> Dictionary:
 				"FRONT_IS_CLEAR":
 					commands.append({"type": "front_is_clear", "source_line": source_line})
 				"PICK_OBJECT":
-					commands.append({"type": "put_object", "source_line": source_line})
+					commands.append({"type": "pick_object", "source_line": source_line})
 				"PUT_OBJECT":
 					commands.append({"type": "put_object", "source_line": source_line})
 

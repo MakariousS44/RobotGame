@@ -31,7 +31,7 @@ signal level_complete
 @export var wall_bottom_offset: float = 0.0
 
 # Optional wall mode: render one solid block sprite per wall cell.
-@export var use_block_wall_png: bool = true
+@export var use_block_wall_png: bool = false
 @export var wall_block_texture: Texture2D = preload("res://assets/textures/kenney_isometric-miniature-prototype/Isometric/block_N.png")
 @export var wall_block_scale: Vector2 = Vector2(0.25, 0.25)
 @export var wall_block_offset: Vector2 = Vector2(0, -26)

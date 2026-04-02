@@ -1,26 +1,15 @@
 [gd_scene format=3 uid="uid://djsg204xq54i8"]
 
-[ext_resource type="Script" uid="uid://bm00goy00ghk" path="res://map/scripts/map_view.gd" id="1_wg7h1"]
+[ext_resource type="Script" uid="uid://bfe5kk71yxsti" path="res://map/scripts/map_view.gd" id="1_wg7h1"]
 [ext_resource type="Script" uid="uid://f2w63y8b8jur" path="res://player/scripts/player.gd" id="2_3whwa"]
-[ext_resource type="Texture2D" uid="uid://clu8us6s6fbbl" path="res://assets/icon.svg" id="3_qebmq"]
 
 [node name="GameTest" type="Node2D" unique_id=918532889]
 script = ExtResource("1_wg7h1")
-wall_north_atlas = Vector2i(10, 1)
-wall_east_atlas = Vector2i(11, 1)
-wall_south_atlas = Vector2i(9, 1)
-wall_west_atlas = Vector2i(8, 1)
 
 [node name="WorldRoot" type="Node2D" parent="." unique_id=1548766223]
 
 [node name="Player" type="Node2D" parent="WorldRoot" unique_id=1807080076]
 script = ExtResource("2_3whwa")
-
-[node name="Marker" type="Polygon2D" parent="WorldRoot/Player" unique_id=1094076341]
-color = Color(1, 0, 0, 1)
-texture = ExtResource("3_qebmq")
-polygon = PackedVector2Array(12, -12, 12, 12, -12, 12, -12, -12)
-uv = PackedVector2Array(12, -12, 12, 12, -12, 12, -12, -12)
 
 [node name="Walls" type="Node2D" parent="WorldRoot" unique_id=1257113904]
 
