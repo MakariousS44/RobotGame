@@ -87,10 +87,9 @@ Press **F5** or click the **Play** button in the top-right of the Godot editor.
 ## How to Play
 
 1. Write C++ or Python code in the **Editor** panel on the left. Use the language selector in the top-right to switch languages.
-2. Click **Validate** to check for errors before running.
-3. Click **Run** to compile and execute your code — watch the robot move!
-4. Click **Step** to execute one command at a time for debugging.
-5. Click **Reset** to reload the world and start over.
+2. Click **Run** to compile and execute your code — watch the robot move!
+3. Click **Step** to execute one command at a time for debugging.
+4. Click **Reset** to reload the world and start over.
 
 ---
 
