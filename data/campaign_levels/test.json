@@ -1,10 +1,10 @@
 {
   "robots": [
 	{
-	  "x": 2,
-	  "y": 2,
-	  "_prev_x": 2,
-	  "_prev_y": 2,
+	  "x": 1,
+	  "y": 1,
+	  "_prev_x": 1,
+	  "_prev_y": 1,
 	  "_prev_orientation": 0,
 	  "objects": {},
 	  "_orientation": 0,
@@ -30,7 +30,10 @@
   "cols": 14,
   "walls": {
 	"2,3": [
-      "south"
+		"west"
+	],
+	"2,4": [
+		"west"
 	]
   },
   "goal": {

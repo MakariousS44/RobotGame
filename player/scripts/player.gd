@@ -48,7 +48,7 @@ func initialize_from_level(robot_data: Dictionary, world_pos: Vector2) -> void:
 	_has_lost = false
 	grid_x = robot_data.get("x", 1)
 	grid_y = robot_data.get("y", 1)
-	facing = robot_data.get("direction", "south")
+	facing = robot_data.get("direction", "north")
 	position = world_pos
 	_rebuild_visuals()
 
@@ -252,26 +252,27 @@ func move_forward() -> void:
 	var world = _get_world()
 	if world == null:
 		return
+		
 
 	var next_x = grid_x
 	var next_y = grid_y
 
 	match facing:
 		"east":
-			next_x += 1
-		"west":
 			next_x -= 1
+		"west":
+			next_x += 1
 		"north":
-			next_y -= 1
+			next_y += 1  
 		"south":
-			next_y += 1
+			next_y -= 1  
 
 	# lose if the player attempts to leave the playable floor
 	if world.has_method("is_in_bounds"):
 		if not world.is_in_bounds(next_x, next_y):
 			_trigger_lose("You lose: attempted to move outside the floor.")
 			return
-
+			
 	# lose on attempted move through a wall edge
 	if world.has_method("is_move_blocked"):
 		if world.is_move_blocked(grid_x, grid_y, facing):
