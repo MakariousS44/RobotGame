@@ -17,26 +17,6 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("3_qe063")
 
-[node name="AspectRatioContainer" type="AspectRatioContainer" parent="." unique_id=1843367750]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_top = 1.5258789e-05
-offset_right = 768.0
-offset_bottom = 432.0
-grow_horizontal = 2
-grow_vertical = 2
-scale = Vector2(0.6, 0.6)
-mouse_filter = 2
-
-[node name="VideoBG" type="VideoStreamPlayer" parent="AspectRatioContainer" unique_id=1733741840]
-layout_mode = 2
-mouse_filter = 2
-stream = ExtResource("2_nu78t")
-autoplay = true
-loop = true
-
 [node name="MenuBG" type="TextureRect" parent="." unique_id=1857734009]
 layout_mode = 1
 anchors_preset = 15
@@ -45,6 +25,25 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("3_qe063")
+
+[node name="AspectRatioContainer" type="AspectRatioContainer" parent="MenuBG" unique_id=1843367750]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = 640.0
+offset_bottom = 360.0
+grow_horizontal = 2
+grow_vertical = 2
+scale = Vector2(0.67, 0.67)
+mouse_filter = 2
+
+[node name="VideoBG" type="VideoStreamPlayer" parent="MenuBG/AspectRatioContainer" unique_id=1733741840]
+layout_mode = 2
+mouse_filter = 2
+stream = ExtResource("2_nu78t")
+autoplay = true
+loop = true
 
 [node name="Logo" type="MarginContainer" parent="MenuBG" unique_id=706626020]
 layout_mode = 1
@@ -130,15 +129,15 @@ script = ExtResource("3_qe063")
 
 [node name="OptionsTab" type="TextureRect" parent="MenuBG" unique_id=1632772630]
 layout_mode = 0
-offset_left = 1152.0
-offset_right = 1752.0
-offset_bottom = 649.0
+offset_left = 1280.0
+offset_right = 1880.0
+offset_bottom = 720.0
 texture = ExtResource("4_nu78t")
 
 [node name="LevelsTab" type="TextureRect" parent="MenuBG" unique_id=2029502849]
 layout_mode = 0
 offset_left = -600.0
-offset_bottom = 649.0
+offset_bottom = 720.0
 texture = ExtResource("4_nu78t")
 
 [node name="MarginContainer" type="MarginContainer" parent="MenuBG/LevelsTab" unique_id=227244431]
@@ -166,9 +165,9 @@ anchors_preset = -1
 anchor_right = 0.093
 anchor_bottom = 0.062000003
 offset_left = 344.0
-offset_top = 350.0
+offset_top = 392.0
 offset_right = 463.2
-offset_bottom = 355.762
+offset_bottom = 392.36
 
 [node name="MenuButton" type="OptionButton" parent="MenuBG/LevelsTab/MarginContainer2" unique_id=1253441802]
 layout_mode = 2
