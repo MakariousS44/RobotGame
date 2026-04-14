@@ -2,11 +2,12 @@ extends Node2D
 
 signal lose_triggered(reason: String)
 
-# === player config ===
+# PLAYER CONFIG
 # movement timing + visual tuning
 @export var use_animated_sprite: bool = true
 @export var player_sprite_frames: SpriteFrames
 @export var idle_animation_name: String = "idle"
+
 @export var move_duration: float = 0.3
 @export var use_sprite_visual: bool = true
 @export var player_texture: Texture2D = preload("res://assets/textures/kenney_isometric-miniature-prototype/Characters/Human/Human_0_Idle0.png")
@@ -18,7 +19,7 @@ signal lose_triggered(reason: String)
 @export var trim_alpha_padding_px: int = 2
 @export var show_player_shadow: bool = false
 
-# optional orientation mapping for incoming JSON _orientation values
+# MAPPING for JSON _orientation values
 # default assumes 0=east, 1=north, 2=west, 3=south
 @export var orientation_0_facing: String = "east"
 @export var orientation_1_facing: String = "north"
@@ -29,7 +30,7 @@ signal lose_triggered(reason: String)
 @export var player_color: Color = Color("7a4df3")
 @export var player_shadow_color: Color = Color(0, 0, 0, 0.18)
 
-# === player state ===
+# PLAYER STATE
 # logical grid position + facing direction
 var grid_x: int = 1
 var grid_y: int = 1
@@ -39,14 +40,14 @@ var _has_lost: bool = false
 
 
 func _ready() -> void:
-	# Ensure a visible body even before level data has been injected.
+	# Ensure visible body before level data injected
 	if get_child_count() == 0:
 		_rebuild_visuals()
 
 
-# === level setup ===
+# LEVEL SETUP
 # called when a level is loaded
-# this file owns player state + player appearance, so setup happens here now
+# owns player state + player appearance
 func initialize_from_level(robot_data: Dictionary, world_pos: Vector2) -> void:
 	_has_lost = false
 	grid_x = robot_data.get("x", 1)
@@ -56,22 +57,35 @@ func initialize_from_level(robot_data: Dictionary, world_pos: Vector2) -> void:
 	_rebuild_visuals()
 
 
-# fallback/simple positioning helper
-# useful if something only wants to move the player without full setup
+# fallback/positioning helper
+# If something wants to move player without full setup
 func set_grid_position(gx: int, gy: int, world_pos: Vector2) -> void:
 	grid_x = gx
 	grid_y = gy
 	position = world_pos
 
 
-# === player visuals ===
+# PLAYER VISUALS
 # rebuilds the debug marker + shadow from scratch
-# later this could become sprites/animations/textures instead
 func _rebuild_visuals() -> void:
 	for child in get_children():
 		child.queue_free()
 
-	if use_animated_sprite and player_sprite_frames != null:
+	if show_player_shadow:
+		var shadow := Polygon2D.new()
+		shadow.name = "Shadow"
+		shadow.polygon = PackedVector2Array([
+			Vector2(0, -6),
+			Vector2(16, 0),
+			Vector2(0, 6),
+			Vector2(-16, 0)
+		])
+		shadow.color = player_shadow_color
+		shadow.position = Vector2(0, 10)
+		shadow.z_index = 99
+		add_child(shadow)
+
+	if use_animated_sprite and player_sprite_frames != null and player_sprite_frames.has_animation(idle_animation_name):
 		var anim := AnimatedSprite2D.new()
 		anim.name = "Body"
 		anim.sprite_frames = player_sprite_frames
@@ -79,7 +93,7 @@ func _rebuild_visuals() -> void:
 		anim.centered = true
 		anim.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		anim.scale = sprite_scale
-		anim.position = sprite_offset
+		anim.position = sprite_offset.round() if snap_sprite_to_pixels else sprite_offset
 		anim.z_index = 100
 		add_child(anim)
 		anim.play()
@@ -87,19 +101,25 @@ func _rebuild_visuals() -> void:
 		_update_facing_visual()
 		return
 
-	if show_player_shadow:
-		var shadow := Polygon2D.new()
-		shadow.name = "Shadow"
-		shadow.polygon = PackedVector2Array([
-			Vector2(0, -6),
-			Vector2(12, 0),
-			Vector2(0, 6),
-			Vector2(-12, 0)
-		])
-		shadow.color = player_shadow_color
-		shadow.position = Vector2(0, 12)
-		shadow.z_index = 99
-		add_child(shadow)
+	if use_sprite_visual and player_texture != null:
+		var sprite := Sprite2D.new()
+		sprite.name = "Body"
+		sprite.texture = player_texture
+		sprite.centered = true
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		if auto_trim_player_region:
+			_apply_trimmed_region(sprite)
+		sprite.scale = sprite_scale
+
+		var tex_height: float = sprite.region_rect.size.y if sprite.region_enabled else float(sprite.texture.get_height())
+		var scaled_half_h := tex_height * sprite.scale.y * 0.5
+		var base_pos := Vector2(0.0, -scaled_half_h)
+		sprite.position = (base_pos + sprite_offset).round() if snap_sprite_to_pixels else (base_pos + sprite_offset)
+		sprite.z_index = 100
+		add_child(sprite)
+
+		_update_facing_visual()
+		return
 
 	var marker := Polygon2D.new()
 	marker.name = "Marker"
@@ -204,6 +224,8 @@ func _update_facing_visual() -> void:
 
 	if rotate_sprite_with_facing:
 		body.rotation_degrees = _facing_angle_deg()
+	else:
+		body.rotation_degrees = 0.0
 
 
 func _facing_angle_deg() -> float:
@@ -230,33 +252,32 @@ func _get_world() -> Node:
 	return world_root.get_parent()
 
 
-# === movement ===
-# updates logical grid coords first, then tweens to the matching world position
+# MOVEMENT
+# updates logical grid coords first, then tweens to matching world position
 func move_forward() -> void:
 	var world = _get_world()
 	if world == null:
 		return
-		
 
 	var next_x = grid_x
 	var next_y = grid_y
 
 	match facing:
 		"east":
-			next_x += 1
-		"west":
 			next_x -= 1
+		"west":
+			next_x += 1
 		"north":
-			next_y += 1  
+			next_y += 1
 		"south":
-			next_y -= 1  
+			next_y -= 1
 
-	# lose if the player attempts to leave the playable floor
+	# lose if the player attempts to leave playable floor
 	if world.has_method("is_in_bounds"):
 		if not world.is_in_bounds(next_x, next_y):
 			_trigger_lose("You lose: attempted to move outside the floor.")
 			return
-			
+
 	# lose on attempted move through a wall edge
 	if world.has_method("is_move_blocked"):
 		if world.is_move_blocked(grid_x, grid_y, facing):
@@ -282,9 +303,8 @@ func _trigger_lose(reason: String) -> void:
 	emit_signal("lose_triggered", reason)
 
 
-# === turning ===
+# TURNING
 # just changes facing for now
-# later could also rotate sprite/marker visually if desired
 func turn_left() -> void:
 	match facing:
 		"east":
@@ -313,9 +333,7 @@ func turn_right() -> void:
 	_update_facing_visual()
 
 
-# === object interaction stubs ===
-# world behavior for objects is still placeholder-ish,
-# so for now the robot just asks the world if it knows how to handle it
+# OBJECT INTERACTION
 func pick_object() -> void:
 	var world = _get_world()
 	if world == null:
