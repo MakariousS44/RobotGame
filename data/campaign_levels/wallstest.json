@@ -1,0 +1,126 @@
+{
+  "robots": [
+	{
+	  "x": 1,
+	  "y": 1,
+	  "_prev_x": 1,
+	  "_prev_y": 1,
+	  "_prev_orientation": 0,
+	  "objects": {},
+	  "_orientation": 0,
+	  "_is_leaky": true,
+	  "_trace_history": [],
+	  "_trace_style": "default",
+	  "_trace_color": "seagreen",
+	  "__id": 6,
+	  "model": "classic",
+	  "possible_initial_positions": [
+		[
+		  1,
+		  1
+		]
+	  ]
+	}
+  ],
+  "walls": {
+	"2,2": [
+      "north"
+	],
+	"3,2": [
+      "north"
+	],
+	"4,2": [
+      "north"
+	],
+	"5,2": [
+      "north"
+	],
+	"5,3": [
+      "east"
+	],
+	"5,4": [
+      "east"
+	],
+	"5,5": [
+      "east"
+	],
+	"6,3": [
+      "east"
+	],
+	"7,3": [
+      "north"
+	],
+	"8,3": [
+      "north"
+	],
+	"6,2": [
+      "east"
+	],
+	"2,4": [
+      "east"
+	],
+	"3,4": [
+	  "north",
+      "east"
+	],
+	"2,6": [
+      "east"
+	],
+	"2,5": [
+      "north"
+	],
+	"7,5": [
+	  "east",
+      "north"
+	],
+	"4,7": [
+      "north"
+	],
+	"3,7": [
+      "east"
+	],
+	"7,6": [
+      "north"
+	],
+	"8,6": [
+      "north"
+	],
+	"8,7": [
+      "east"
+	],
+	"8,8": [
+      "east"
+	],
+	"3,9": [
+      "north"
+	],
+	"2,9": [
+      "north"
+	],
+	"1,9": [
+      "east"
+	],
+	"1,8": [
+      "east"
+	],
+	"3,3": [
+      "north"
+	],
+	"7,9": [
+	  "north",
+      "east"
+	],
+	"6,9": [
+      "east"
+	],
+	"7,8": [
+      "north"
+	]
+  },
+  "description": [
+    "A simple, empty world, ready for Reeborg to explore."
+  ],
+  "small_tiles": false,
+  "rows": 10,
+  "cols": 10
+}

@@ -1,0 +1,44 @@
+[gd_scene format=3 uid="uid://djsg204xq54i8"]
+
+[ext_resource type="Script" uid="uid://bfe5kk71yxsti" path="res://map/scripts/map_view.gd" id="1_wg7h1"]
+[ext_resource type="Script" uid="uid://f2w63y8b8jur" path="res://player/scripts/player.gd" id="2_3whwa"]
+[ext_resource type="TileSet" uid="uid://b6gsgqpyxclcm" path="res://assets/tilesheets/stuff.tres" id="2_wg7h1"]
+[ext_resource type="PackedScene" uid="uid://cti0jnjiirxsp" path="res://player/player.tscn" id="3_wg7h1"]
+
+[node name="GameTest" type="Node2D" unique_id=918532889]
+y_sort_enabled = true
+script = ExtResource("1_wg7h1")
+
+[node name="WorldRoot" type="Node2D" parent="." unique_id=1548766223]
+y_sort_enabled = true
+
+[node name="FloorMapLayer" type="TileMapLayer" parent="WorldRoot" unique_id=1515259475]
+y_sort_enabled = true
+position = Vector2(128, 0)
+scale = Vector2(2, 2)
+tile_set = ExtResource("2_wg7h1")
+
+[node name="WallMapLayer" type="TileMapLayer" parent="WorldRoot" unique_id=158218729]
+z_index = 1
+y_sort_enabled = true
+tile_set = ExtResource("2_wg7h1")
+
+[node name="Player" parent="WorldRoot" unique_id=631264519 instance=ExtResource("3_wg7h1")]
+z_index = 1
+y_sort_enabled = true
+position = Vector2(423.00006, 368)
+scale = Vector2(2.5, 2.5)
+script = ExtResource("2_3whwa")
+
+[node name="Grid" type="Node2D" parent="WorldRoot" unique_id=1401474488]
+visible = false
+
+[node name="Objects" type="Node2D" parent="WorldRoot" unique_id=1234577301]
+visible = false
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=1239584116]
+limit_enabled = false
+limit_left = -869
+limit_top = -498
+limit_right = 1050
+limit_bottom = 583

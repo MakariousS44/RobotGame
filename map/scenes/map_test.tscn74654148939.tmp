@@ -1,0 +1,22 @@
+[gd_scene format=3 uid="uid://k1uflbaacqk5"]
+
+[ext_resource type="TileSet" uid="uid://b6gsgqpyxclcm" path="res://assets/tilesheets/stuff.tres" id="1_41ylq"]
+[ext_resource type="Script" uid="uid://csc4r0awulntq" path="res://map/scripts/map_test.gd" id="1_dyoo3"]
+
+[node name="MapTest" type="Node2D" unique_id=1549900935]
+y_sort_enabled = true
+script = ExtResource("1_dyoo3")
+
+[node name="FloorTileMap" type="TileMapLayer" parent="." unique_id=597290683]
+y_sort_enabled = true
+position = Vector2(128, 0)
+scale = Vector2(2, 2)
+tile_set = ExtResource("1_41ylq")
+
+[node name="WallTileMap" type="TileMapLayer" parent="." unique_id=738935499]
+z_index = 1
+y_sort_enabled = true
+tile_set = ExtResource("1_41ylq")
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=965837152]
+position = Vector2(642, 361)
