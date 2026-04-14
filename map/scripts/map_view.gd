@@ -48,6 +48,7 @@ signal level_complete
 # === loaded level state ===
 # this is already-usable level data, not raw JSON
 var level_data: Dictionary = {}
+var objects: Dictionary = {}
 var rows: int = 0
 var cols: int = 0
 var wall_cells: Dictionary = {}
@@ -70,6 +71,7 @@ func build_level(data: Dictionary) -> void:
 	level_data = data
 	rows = data.get("rows", 10)
 	cols = data.get("cols", 10)
+	objects = data.get("objects", {}).duplicate(true)
 
 	# wipe old visuals so we don't stack levels on top of each other
 	_clear_children(floor_node)
@@ -96,6 +98,7 @@ func build_level(data: Dictionary) -> void:
 	_place_player()
 	_build_walls()
 	_center_camera()
+	_build_objects()
 
 
 # === board shadow ===
@@ -316,32 +319,32 @@ func _add_wall_segment(gx: int, gy: int, dir: String) -> void:
 func _add_wall_segment_tiles(gx: int, gy: int, dir: String) -> void:
 	var c := _cell_center(gx, gy)
 
-	var top    := c + Vector2(0, -tile_height / 2.0)
-	var right  := c + Vector2(tile_width / 2.0, 0)
+	var top := c + Vector2(0, -tile_height / 2.0)
+	var right := c + Vector2(tile_width / 2.0, 0)
 	var bottom := c + Vector2(0, tile_height / 2.0)
-	var left   := c + Vector2(-tile_width / 2.0, 0)
+	var left := c + Vector2(-tile_width / 2.0, 0)
 
 	var start := Vector2.ZERO
-	var end   := Vector2.ZERO
+	var end := Vector2.ZERO
 	var tex: Texture2D
 
 	match dir:
 		"north":
 			start = top
-			end   = right
-			tex   = wall_north_atlas
+			end = right
+			tex = wall_north_atlas
 		"east":
 			start = right
-			end   = bottom
-			tex   = wall_east_atlas
+			end = bottom
+			tex = wall_east_atlas
 		"south":
 			start = bottom
-			end   = left
-			tex   = wall_north_atlas
+			end = left
+			tex = wall_north_atlas
 		"west":
 			start = left
-			end   = top
-			tex   = wall_east_atlas
+			end = top
+			tex = wall_east_atlas
 		_:
 			return
 
@@ -355,24 +358,30 @@ func _add_wall_segment_tiles(gx: int, gy: int, dir: String) -> void:
 		region = _wall_trim_cache[tex_path]
 	else:
 		var image := tex.get_image()
-		var min_x := image.get_width();  var max_x := -1
-		var min_y := image.get_height(); var max_y := -1
+		var min_x := image.get_width()
+		var max_x := -1
+		var min_y := image.get_height()
+		var max_y := -1
 		for y in range(image.get_height()):
 			for x in range(image.get_width()):
 				if image.get_pixel(x, y).a > 0.01:
-					if x < min_x: min_x = x
-					if y < min_y: min_y = y
-					if x > max_x: max_x = x
-					if y > max_y: max_y = y
+					if x < min_x:
+						min_x = x
+					if y < min_y:
+						min_y = y
+					if x > max_x:
+						max_x = x
+					if y > max_y:
+						max_y = y
 		if max_x < 0:
 			return
 		region = Rect2(Vector2(min_x, min_y), Vector2(max_x - min_x + 1, max_y - min_y + 1))
 		_wall_trim_cache[tex_path] = region
 
 	var edge_len := (end - start).length()
-	var anchor   := (start + end) * 0.5
-	var scale_x  := edge_len / region.size.x
-	var scale_y  := scale_x
+	var anchor := (start + end) * 0.5
+	var scale_x := edge_len / region.size.x
+	var scale_y := scale_x
 	var scaled_h := region.size.y * scale_y
 
 	var sprite := Sprite2D.new()
@@ -556,6 +565,7 @@ func _cell_has_wall_edge(gx: int, gy: int, dir: String) -> bool:
 
 	return false
 
+
 # === win condition ===
 func check_win_condition(gx: int, gy: int) -> void:
 	if not level_data.has("goal"):
@@ -575,3 +585,101 @@ func check_win_condition(gx: int, gy: int) -> void:
 		if typeof(pos) == TYPE_DICTIONARY:
 			if int(pos.get("x", -1)) == gx and int(pos.get("y", -1)) == gy:
 				level_complete.emit()
+
+
+# === objects ===
+# render objects as small colored diamonds for now
+func _build_objects() -> void:
+	_clear_children(objects_node)
+
+	for key in objects.keys():
+		var parts = key.split(",")
+		if parts.size() != 2:
+			continue
+
+		var gx := int(parts[0])
+		var gy := int(parts[1])
+
+		var tile_objects: Dictionary = objects[key]
+
+		for object_name in tile_objects.keys():
+			var count := int(tile_objects[object_name])
+
+			for i in range(count):
+				_spawn_object(object_name, gx, gy, i)
+
+
+func _spawn_object(object_name: String, gx: int, gy: int, index: int) -> void:
+	var marker := Polygon2D.new()
+
+	marker.polygon = PackedVector2Array([
+		Vector2(0, -8),
+		Vector2(8, 0),
+		Vector2(0, 8),
+		Vector2(-8, 0)
+	])
+
+	marker.color = _get_object_color(object_name)
+	marker.position = _cell_center(gx, gy) + Vector2(0, -6 - 8 * index)
+	marker.z_index = 1
+
+	objects_node.add_child(marker)
+
+
+func _get_object_color(object_name: String) -> Color:
+	match object_name:
+		"apple":
+			return Color(1.0, 0.2, 0.2)
+		"banana":
+			return Color(1.0, 0.9, 0.2)
+		"carrot":
+			return Color(1.0, 0.5, 0.1)
+		"star":
+			return Color(1.0, 1.0, 0.3)
+		"token":
+			return Color(0.3, 0.8, 1.0)
+		_:
+			return Color(1.0, 1.0, 1.0)
+
+
+func get_objects_at(gx: int, gy: int) -> Dictionary:
+	return objects.get(_cell_key(gx, gy), {})
+
+
+func remove_object_at(gx: int, gy: int) -> String:
+	var key := _cell_key(gx, gy)
+
+	if not objects.has(key):
+		return ""
+
+	var tile_objects: Dictionary = objects[key]
+
+	for object_name in tile_objects.keys():
+		tile_objects[object_name] -= 1
+
+		if tile_objects[object_name] <= 0:
+			tile_objects.erase(object_name)
+
+		if tile_objects.is_empty():
+			objects.erase(key)
+
+		_build_objects()
+		return object_name
+
+	return ""
+
+
+func place_object_at(gx: int, gy: int, object_name: String) -> void:
+	if object_name == "":
+		return
+
+	var key := _cell_key(gx, gy)
+
+	if not objects.has(key):
+		objects[key] = {}
+
+	if not objects[key].has(object_name):
+		objects[key][object_name] = 0
+
+	objects[key][object_name] += 1
+	_build_objects()

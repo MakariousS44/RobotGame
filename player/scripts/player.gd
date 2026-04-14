@@ -33,6 +33,7 @@ signal lose_triggered(reason: String)
 # logical grid position + facing direction
 var grid_x: int = 1
 var grid_y: int = 1
+var carried_object: String = ""
 var facing: String = "north"
 var _trim_region_cache: Dictionary = {}
 var _has_lost: bool = false
@@ -320,13 +321,24 @@ func pick_object() -> void:
 	var world = _get_world()
 	if world == null:
 		return
+
+	if carried_object != "":
+		return
+
 	if world.has_method("remove_object_at"):
-		world.remove_object_at(grid_x, grid_y)
+		var obj = world.remove_object_at(grid_x, grid_y)
+		if obj != "":
+			carried_object = obj
 
 
 func put_object() -> void:
 	var world = _get_world()
 	if world == null:
 		return
+
+	if carried_object == "":
+		return
+
 	if world.has_method("place_object_at"):
-		world.place_object_at(grid_x, grid_y)
+		world.place_object_at(grid_x, grid_y, carried_object)
+		carried_object = ""
