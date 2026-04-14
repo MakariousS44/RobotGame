@@ -12,7 +12,8 @@ func _init() -> void:
 func validate(source: String) -> Dictionary:
 	return _validator.validate(source)
 
-func run(source: String) -> Dictionary:
+func run(source: String, world_state: Dictionary = {}) -> Dictionary:
+	_compiler.api_source = _commands.get_python_api(world_state)
 	var result = _compiler.run(source)
 	return {
 		"ok":     result.success,

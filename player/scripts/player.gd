@@ -51,7 +51,7 @@ func initialize_from_level(robot_data: Dictionary, world_pos: Vector2) -> void:
 	_has_lost = false
 	grid_x = robot_data.get("x", 1)
 	grid_y = robot_data.get("y", 1)
-	facing = robot_data.get("direction", "north")
+	facing = _extract_initial_facing(robot_data)
 	position = world_pos
 	_rebuild_visuals()
 
@@ -330,3 +330,66 @@ func put_object() -> void:
 		return
 	if world.has_method("place_object_at"):
 		world.place_object_at(grid_x, grid_y)
+
+
+# === helper: relative directions ===
+func _right_of(dir: String) -> String:
+	match dir:
+		"north": return "east"
+		"east":  return "south"
+		"south": return "west"
+		"west":  return "north"
+	return dir
+
+
+func _left_of(dir: String) -> String:
+	match dir:
+		"north": return "west"
+		"west":  return "south"
+		"south": return "east"
+		"east":  return "north"
+	return dir
+
+
+# === sensor functions ===
+func front_is_clear() -> bool:
+	var world = _get_world()
+	if world == null:
+		return false
+	if not world.has_method("is_move_blocked"):
+		return true
+	return not world.is_move_blocked(grid_x, grid_y, facing)
+
+
+func right_is_clear() -> bool:
+	var world = _get_world()
+	if world == null:
+		return false
+	if not world.has_method("is_move_blocked"):
+		return true
+	return not world.is_move_blocked(grid_x, grid_y, _right_of(facing))
+
+
+func left_is_clear() -> bool:
+	var world = _get_world()
+	if world == null:
+		return false
+	if not world.has_method("is_move_blocked"):
+		return true
+	return not world.is_move_blocked(grid_x, grid_y, _left_of(facing))
+
+
+func wall_in_front() -> bool:
+	return not front_is_clear()
+
+
+func wall_on_right() -> bool:
+	return not right_is_clear()
+
+
+func wall_on_left() -> bool:
+	return not left_is_clear()
+
+
+func is_facing_north() -> bool:
+	return facing == "north"

@@ -10,10 +10,10 @@ const Paths = preload("res://execution/shared/paths.gd")
 
 var _commands = preload(Paths.ROBOT_COMMANDS).new()
 
-func prepare_build_files(source: String) -> void:
+func prepare_build_files(source: String, world_state: Dictionary = {}) -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(BUILD_DIR))
 	_write_file(STUDENT_CPP, source)
-	_write_robot_files()
+	_write_robot_files(world_state)
 
 func compile_program() -> Dictionary:
 	var output: Array = []
@@ -101,6 +101,6 @@ func _write_file(path: String, text: String) -> void:
 		return
 	f.store_string(text)
 
-func _write_robot_files() -> void:
+func _write_robot_files(world_state: Dictionary = {}) -> void:
 	_write_file(ROBOT_HPP, _commands.get_cpp_header())
-	_write_file(ROBOT_CPP, _commands.get_cpp_source())
+	_write_file(ROBOT_CPP, _commands.get_cpp_source(world_state))

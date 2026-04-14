@@ -357,11 +357,41 @@ func _on_go_to_menu() -> void:
 
 
 # === pipeline execution ===
+func _get_world_state() -> Dictionary:
+	if game_instance == null or player_node == null:
+		return {}
+		
+	var goal_x := -1
+	var goal_y := -1
+	var goal = game_instance.level_data.get("goal", {})
+	if goal.has("possible_final_positions"):
+		var positions = goal["possible_final_positions"]
+		if positions.size() > 0 and positions[0].size() >= 2:
+			goal_x = int(positions[0][0])
+			goal_y = int(positions[0][1])
+	elif goal.has("position"):
+		var pos = goal["position"]
+		goal_x = int(pos.get("x", -1))
+		goal_y = int(pos.get("y", -1))
+		
+	return {
+		"x":      player_node.grid_x,
+		"y":      player_node.grid_y,
+		"facing": player_node.facing,
+		"rows":   game_instance.rows,
+		"cols":   game_instance.cols,
+		"walls":  game_instance.level_data.get("walls", {}),
+		"goal_x": goal_x,
+		"goal_y": goal_y,
+	}
+
 
 func _run_pipeline(step_only: bool) -> void:
 	reset_button.disabled = false
 	run_button.disabled = true
 	step_button.disabled = true
+	
+	var world_state := _get_world_state()
 	
 	_set_status("Running..." if not step_only else "Compiling...", "")
 	output_box.clear()
@@ -379,7 +409,7 @@ func _run_pipeline(step_only: bool) -> void:
 			_re_enable_buttons()
 			return
 
-		var python_run_result: Dictionary = py_pipeline.run(editor.text)
+		var python_run_result: Dictionary = py_pipeline.run(editor.text, world_state)
 		if not python_run_result.ok:
 			log_error(python_run_result.output)
 			_set_status("Runtime error", "error")
@@ -402,7 +432,7 @@ func _run_pipeline(step_only: bool) -> void:
 
 	var generated: Dictionary = generator.generate(editor.text)
 	current_line_offset = generated.line_offset
-	compiler.prepare_build_files(generated.generated_source)
+	compiler.prepare_build_files(generated.generated_source, world_state)
 
 	var build: Dictionary = compiler.compile_program()
 	if not build.ok:
