@@ -1,0 +1,94 @@
+[gd_resource type="TileSet" format=3 uid="uid://du3f76mrdqeor"]
+
+[ext_resource type="Texture2D" uid="uid://c2aaxw3lm50uu" path="res://assets/tilesheets/wall.png" id="1_yj8ib"]
+[ext_resource type="Texture2D" uid="uid://ducn7cjdenox3" path="res://assets/tilesheets/floor.png" id="2_0erse"]
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_yj8ib"]
+texture = ExtResource("1_yj8ib")
+texture_region_size = Vector2i(256, 512)
+0:0/0 = 0
+0:0/0/texture_origin = Vector2i(0, 192)
+0:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(0, -64, -128, 0, 0, 64, 32, 48, -64, 0, 32, -48)
+0:1/0 = 0
+0:1/0/texture_origin = Vector2i(0, 192)
+0:1/0/physics_layer_0/polygon_0/points = PackedVector2Array(0, -64, -128, 0, -96, 16, 32, -48)
+1:0/0 = 0
+1:0/0/texture_origin = Vector2i(0, 192)
+1:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-96, -16, -128, 0, 0, 64, 128, 0, 96, -16, 0, 32)
+1:1/0 = 0
+1:1/0/texture_origin = Vector2i(0, 192)
+1:1/0/physics_layer_0/polygon_0/points = PackedVector2Array(0, 64, 32, 48, -96, -16, -128, 0)
+2:0/0 = 0
+2:0/0/texture_origin = Vector2i(0, 192)
+2:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(0, -64, -128, 0, -96, 16, 0, -32, 96, 16, 128, 0)
+2:1/0 = 0
+2:1/0/texture_origin = Vector2i(0, 192)
+2:1/0/physics_layer_0/polygon_0/points = PackedVector2Array(96, 16, 128, 0, 0, -64, -32, -48)
+3:0/0 = 0
+3:0/0/texture_origin = Vector2i(0, 192)
+3:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(64, 0, -32, 48, 0, 64, 128, 0, 0, -64, -32, -48)
+3:1/0 = 0
+3:1/0/texture_origin = Vector2i(0, 192)
+3:1/0/physics_layer_0/polygon_0/points = PackedVector2Array(0, 64, 128, 0, 96, -16, -32, 48)
+4:0/0 = 0
+4:0/0/texture_origin = Vector2i(0, 192)
+4:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(0, -64, -128, 0, 0, 64, 32, 48, -64, 0, 32, -48)
+4:1/0 = 0
+4:1/0/texture_origin = Vector2i(0, 192)
+4:1/0/physics_layer_0/polygon_0/points = PackedVector2Array(0, -64, -128, 0, -96, 16, 32, -48)
+5:0/0 = 0
+5:0/0/texture_origin = Vector2i(0, 192)
+5:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-96, -16, -128, 0, 0, 64, 128, 0, 96, -16, 0, 32)
+5:1/0 = 0
+5:1/0/texture_origin = Vector2i(0, 192)
+5:1/0/physics_layer_0/polygon_0/points = PackedVector2Array(0, 64, 32, 48, -96, -16, -128, 0)
+6:0/0 = 0
+6:0/0/texture_origin = Vector2i(0, 192)
+6:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(0, -64, -128, 0, -96, 16, 0, -32, 96, 16, 128, 0)
+6:1/0 = 0
+6:1/0/texture_origin = Vector2i(0, 192)
+6:1/0/physics_layer_0/polygon_0/points = PackedVector2Array(96, 16, 128, 0, 0, -64, -32, -48)
+7:0/0 = 0
+7:0/0/texture_origin = Vector2i(0, 192)
+7:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(64, 0, -32, 48, 0, 64, 128, 0, 0, -64, -32, -48)
+7:1/0 = 0
+7:1/0/texture_origin = Vector2i(0, 192)
+7:1/0/physics_layer_0/polygon_0/points = PackedVector2Array(0, 64, 128, 0, 96, -16, -32, 48)
+0:2/0 = 0
+0:2/0/texture_origin = Vector2i(0, 192)
+1:2/0 = 0
+1:2/0/texture_origin = Vector2i(0, 192)
+2:2/0 = 0
+2:2/0/texture_origin = Vector2i(0, 192)
+3:2/0 = 0
+3:2/0/texture_origin = Vector2i(0, 192)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_iqart"]
+texture = ExtResource("2_0erse")
+texture_region_size = Vector2i(256, 512)
+0:0/0 = 0
+0:0/0/texture_origin = Vector2i(0, 172)
+1:0/0 = 0
+1:0/0/texture_origin = Vector2i(0, 172)
+2:0/0 = 0
+2:0/0/texture_origin = Vector2i(0, 172)
+3:0/0 = 0
+3:0/0/texture_origin = Vector2i(0, 172)
+0:1/0 = 0
+0:1/0/texture_origin = Vector2i(0, 192)
+1:1/0 = 0
+1:1/0/texture_origin = Vector2i(0, 192)
+2:1/0 = 0
+2:1/0/texture_origin = Vector2i(0, 192)
+3:1/0 = 0
+3:1/0/texture_origin = Vector2i(0, 192)
+
+[resource]
+tile_shape = 1
+tile_layout = 4
+tile_size = Vector2i(256, 128)
+physics_layer_0/collision_layer = 1
+physics_layer_0/collision_mask = 0
+sources/8 = SubResource("TileSetAtlasSource_iqart")
+sources/44 = SubResource("TileSetAtlasSource_yj8ib")
+tile_proxies/coords_level = [[0, Vector2i(0, 0)], [8, Vector2i(0, 0)], [1, Vector2i(0, 0)], [8, Vector2i(1, 0)], [2, Vector2i(0, 0)], [8, Vector2i(2, 0)], [3, Vector2i(0, 0)], [8, Vector2i(3, 0)], [4, Vector2i(0, 0)], [8, Vector2i(0, 1)], [5, Vector2i(0, 0)], [8, Vector2i(1, 1)], [6, Vector2i(0, 0)], [8, Vector2i(2, 1)], [7, Vector2i(0, 0)], [8, Vector2i(3, 1)], [17, Vector2i(0, 0)], [33, Vector2i(0, 0)], [18, Vector2i(0, 0)], [33, Vector2i(1, 0)], [19, Vector2i(0, 0)], [33, Vector2i(2, 0)], [20, Vector2i(0, 0)], [33, Vector2i(3, 0)], [21, Vector2i(0, 0)], [33, Vector2i(4, 0)], [22, Vector2i(0, 0)], [33, Vector2i(5, 0)], [23, Vector2i(0, 0)], [33, Vector2i(6, 0)], [24, Vector2i(0, 0)], [33, Vector2i(7, 0)], [25, Vector2i(0, 0)], [33, Vector2i(0, 1)], [26, Vector2i(0, 0)], [33, Vector2i(1, 1)], [27, Vector2i(0, 0)], [33, Vector2i(2, 1)], [28, Vector2i(0, 0)], [33, Vector2i(3, 1)], [29, Vector2i(0, 0)], [33, Vector2i(4, 1)], [30, Vector2i(0, 0)], [33, Vector2i(5, 1)], [31, Vector2i(0, 0)], [33, Vector2i(6, 1)], [32, Vector2i(0, 0)], [33, Vector2i(7, 1)], [33, Vector2i(0, 0)], [44, Vector2i(0, 0)], [33, Vector2i(0, 1)], [44, Vector2i(0, 1)], [33, Vector2i(1, 0)], [44, Vector2i(1, 0)], [33, Vector2i(1, 1)], [44, Vector2i(1, 1)], [33, Vector2i(2, 0)], [44, Vector2i(2, 0)], [33, Vector2i(2, 1)], [44, Vector2i(2, 1)], [33, Vector2i(3, 0)], [44, Vector2i(3, 0)], [33, Vector2i(3, 1)], [44, Vector2i(3, 1)], [33, Vector2i(4, 0)], [44, Vector2i(4, 0)], [33, Vector2i(4, 1)], [44, Vector2i(4, 1)], [33, Vector2i(5, 0)], [44, Vector2i(5, 0)], [33, Vector2i(5, 1)], [44, Vector2i(5, 1)], [33, Vector2i(6, 0)], [44, Vector2i(6, 0)], [33, Vector2i(6, 1)], [44, Vector2i(6, 1)], [33, Vector2i(7, 0)], [44, Vector2i(7, 0)], [33, Vector2i(7, 1)], [44, Vector2i(7, 1)], [36, Vector2i(0, 0)], [44, Vector2i(0, 2)], [37, Vector2i(0, 0)], [44, Vector2i(1, 2)], [38, Vector2i(0, 0)], [44, Vector2i(2, 2)], [39, Vector2i(0, 0)], [44, Vector2i(3, 2)]]

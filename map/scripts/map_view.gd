@@ -2,570 +2,440 @@ extends Node2D
 
 signal level_complete
 
-
-# === visual config ===
-# tweakables so we're not hardcoding mystery numbers all over the place
-@export var tile_width: int = 64
-@export var tile_height: int = 32
-
-@export var use_tilesheet_floor: bool = true
-@export var use_tilesheet_walls: bool = true
-
-@export var floor_texture: Texture2D = preload("res://assets/tilesheets/ground.png")
-@export var floor_tile_pixel_size: Vector2i = Vector2i(256, 128)
-@export var floor_primary_atlas: Vector2i = Vector2i(0, 3)
-@export var floor_alt_atlas: Vector2i = Vector2i(0, 3)
-@export var floor_use_checker_alt: bool = true
-@export var floor_use_json_tiles: bool = true
-@export var floor_json_marked_atlas: Vector2i = Vector2i(3, 7)
-@export var floor_goal_atlas: Vector2i = Vector2i(2, 7)
-@export var floor_goal_color: Color = Color(0.95, 0.80, 0.20, 1)
-@export var floor_bottom_offset: float = 0.0
-
-@export var wall_north_atlas: Texture2D = preload("res://assets/textures/kenney_isometric-miniature-prototype/Isometric/wallHalf_N.png")
-@export var wall_east_atlas: Texture2D = preload("res://assets/textures/kenney_isometric-miniature-prototype/Isometric/wallHalf_E.png")
-@export var wall_position_offset: Vector2 = Vector2(0, 10)
-
-@export var floor_color: Color = Color("6d8f58")
-@export var floor_color_alt: Color = Color("769862")
-@export var grid_color: Color = Color("d0d5c8")
-@export var show_grid_overlay: bool = true
-@export var wall_color: Color = Color(1, 0, 0, 1)
-@export var board_shadow_color: Color = Color(0, 0, 0, 0.14)
-
-
-# === scene references ===
-# all the visual level layers live under WorldRoot
-@onready var world_root: Node2D = $WorldRoot
-@onready var floor_node: Node2D = $WorldRoot/Floor
-@onready var grid_node: Node2D = $WorldRoot/Grid
-@onready var walls_node: Node2D = $WorldRoot/Walls
-@onready var objects_node: Node2D = $WorldRoot/Objects
-@onready var player: Node2D = $WorldRoot/Player
 @onready var camera: Camera2D = $Camera2D
+@onready var world_root: Node2D = $WorldRoot
+@onready var player: Node2D = $WorldRoot/Player
+@onready var objects_node: Node2D = $WorldRoot/Objects
+@onready var FloorTiles: TileMapLayer = $WorldRoot/FloorMapLayer
+@onready var WallTiles: TileMapLayer = $WorldRoot/WallMapLayer
 
+# ============ Global Values ============
 
-
-# === loaded level state ===
-# this is already-usable level data, not raw JSON
 var level_data: Dictionary = {}
-var objects: Dictionary = {}
-var rows: int = 0
-var cols: int = 0
-var wall_cells: Dictionary = {}
-var goal_cells: Dictionary = {}
-var _wall_trim_cache: Dictionary = {}
+var object_data: Dictionary = {}
+var world_x_size : int = 10
+var world_y_size : int = 10
+var player_x_pos : int = 0
+var player_y_pos : int = 0
+var rotation_state = 0
+var offset_x = 256
+var offset_y = 64
+var player_moved = false
 
+
+# CAUTION: Do not change this is to scale to the floor size
+const chunk_size = 2
+# =======================================
 
 # === scene lifecycle ===
 # runs when this scene is instantiated into the tree
 # this scene owns the camera, so it configures it here
 func _ready() -> void:
-	camera.enabled = true
-	camera.make_current()
+	#EventManager.rotate_camera_left.connect(rotate_world_left)
+	#EventManager.rotate_camera_right.connect(rotate_world_right)
+	pass
 
 
-# === main entry point ===
-# outside code gives this scene a level definition dictionary
-# this file then builds the full playable board from it
+# ======= MAIN POINT: Build Rendition =======
+## Builds a world given that JSON data (format: Reborg)
+##
+## INPUTS: A dictonary that describe the world (obj:description)
+## OUTPUS: A render of the world given by dictionary
 func build_level(data: Dictionary) -> void:
 	level_data = data
-	rows = data.get("rows", 10)
-	cols = data.get("cols", 10)
-	objects = data.get("objects", {}).duplicate(true)
+	object_data = data.get("objects", {})
+	# IF NEEDED: enforce ordering
+	FloorTiles.z_index = 0
+	WallTiles.z_index  = 1
+	player.z_index     = 1
+	objects_node.z_index = 1
+	
+	# Generate the Floor Grid
+	if data.has("cols") and data.has("rows"):
+		var cols = int(data["cols"])
+		var rows = int(data["rows"])
+		
+		world_x_size = cols
+		world_y_size = rows
+		print("Floor: ", cols,"x",rows)
+		
+		# Create the floor
+		_build_floor(cols, rows)
+		# Create the wall
+		_build_walls(data, cols, rows)
+		# Create the player
+		_place_player(data, cols, rows)
+		# Place goals
+		_build_goal_cells(data, cols, rows)
+		# Set the camera
+		_center_camera(cols, rows)
+		_build_objects()
+	else:
+		push_warning("JSON loaded, but 'cols' or 'rows' keys were missing!")
 
-	# wipe old visuals so we don't stack levels on top of each other
-	_clear_children(floor_node)
-	_clear_children(grid_node)
-	_clear_children(walls_node)
-	_clear_children(objects_node)
-	wall_cells.clear()
-	goal_cells.clear()
-	_wall_trim_cache.clear()
-	_build_goal_cells()
+## Just signal rotation state to the right and calls for redraw
+func rotate_world_right():
+	rotation_state -=1
+	if rotation_state == -1:
+		rotation_state = 3
+	_rotate_world()
 
-	# enforce consistent draw order
-	floor_node.z_index = 0
-	grid_node.z_index = 1
-	walls_node.z_index = 2
-	objects_node.z_index = 3
-	player.z_index = 10
-	walls_node.y_sort_enabled = true
+## Just signal rotation state to the left and calls for redraw
+func rotate_world_left():
+	rotation_state +=1
+	if rotation_state == 4:
+		rotation_state = 0
+	_rotate_world()
 
-	_build_board_shadow()
-	_build_floor()
-	if show_grid_overlay:
-		_build_grid()
-	_place_player()
-	_build_walls()
-	_center_camera()
-	_build_objects()
+## Rebuild the wolrd given a new rotation state
+func _rotate_world():
+	var data = level_data
+	
+	# Generate the Floor Grid
+	if data.has("cols") and data.has("rows"):
+		# Given the rotation step are cols and rows swap
+		var cols = int(data["cols"])
+		var rows = int(data["rows"])
+		
+		print(rotation_state)
 
+		world_x_size = cols
+		world_y_size = rows
+		print("Floor: ", cols,"x",rows)
+		
+		# Create the floor
+		_build_floor(cols, rows)
+		# Create the wall
+		#_build_walls(data, cols, rows)
+		# Create the player
+		_place_player(data, cols, rows)
+		# Place goals
+		#_build_goal_cells(data, cols, rows)
+		# Set the camera
+		#_center_camera(cols, rows)
+	else:
+		push_warning("JSON loaded, but 'cols' or 'rows' keys were missing!")
 
-# === board shadow ===
-# purely visual polish so the board doesn't feel like it’s floating in void
-func _build_board_shadow() -> void:
-	var shadow := Polygon2D.new()
+# ====== World Rendering Functions ======
+## This builds the floor given the grid size
+func _build_floor(cols: int,rows: int) -> void:
+	# Clear current floor
+	FloorTiles.clear()
+	# Loop through every x (column) and y (row) to fill the grid
+	var max_grid = max(cols,rows)
+	
+	for x in range(cols):
+		var draw_x = x
+		for y in range(rows):
+			var draw_y = y
+				# Swap the coordinates based on the current angle!
+			if rotation_state == 1: # 90 Degrees
+				draw_x = y
+				draw_y = x
+			elif rotation_state == 2: # 180 Degrees
+				draw_x = (max_grid - 1) - x
+				draw_y = (max_grid - 1) - y
+			elif rotation_state == 3: # 270 Degrees
+				draw_x = (max_grid - 1) - y
+				draw_y = (max_grid - 1) - x
+			
+			var grid_pos = Vector2i(draw_x,draw_y)
+			# Draw your floor tile (Assuming source_id 0 and atlas coords 0,0)
+			FloorTiles.set_cell(grid_pos, 8, Vector2i(0, 1))
 
-	var top := _cell_center(1, rows)
-	var right := _cell_center(1, 1)
-	var bottom := _cell_center(cols, 1)
-	var left := _cell_center(cols, rows)
+## This builds the walls given its coordinate and face
+func _build_walls(data: Dictionary, cols: int, rows: int) -> void:
+	# Define how big each logical cell is in physical tiles
+	cols = (cols) * chunk_size
+	@warning_ignore("narrowing_conversion")
+	rows = (rows+0.5) * chunk_size
+	print("Scaled size: ", cols, ",", rows)
 
-	shadow.polygon = PackedVector2Array([
-		top + Vector2(0, 18),
-		right + Vector2(0, 18),
-		bottom + Vector2(0, 18),
-		left + Vector2(0, 18)
-	])
-	shadow.color = board_shadow_color
-	shadow.z_index = -1
+	# Generate the walls
+	# The dictonary is formated as:
+	#		 ["x-coords","y-coords"] : ["direction"]
+	
+	if data.has("walls"):
+		var walls = Dictionary(data["walls"])
+		for keys in walls:
+			# Obtain wall position
+			var wall_coords = keys.split(",")
+			var x_coords = int(wall_coords[0])
+			var y_coords = int(wall_coords[1])
+			var grid_pos = Vector2((x_coords)*chunk_size - 1, rows - (y_coords)*chunk_size)
+			
+			# Obtain wall direction
+			# CRITICAL: Reborg world only utilizes "east" and "north"
+			# - This is optimize for Reborg world editor
+			# - An array of size of 1, is either a wall facing "east" and "north"
+			# - An array of size of 2, is a corner betwenn  "east" and "north" 
+			var wall_directions = walls[keys]
+			if wall_directions.size() == 1:
+				# ONLY EAST WALL
+				if wall_directions[0] == "east":
+					WallTiles.set_cell(grid_pos, 44, Vector2i(6,1))
+					
+					grid_pos = Vector2(grid_pos[0], grid_pos[1]+1)
+					WallTiles.set_cell(grid_pos, 44, Vector2i(6,1))
+				# ONLY NORTH WALL
+				else:
+					
+					WallTiles.set_cell(grid_pos, 44, Vector2i(4,1))
+					
+					grid_pos = Vector2(grid_pos[0]-1, grid_pos[1])
+					WallTiles.set_cell(grid_pos, 44, Vector2i(4,1))
+			# ONLY CORNER WALL
+			else:
+				var temp_pos = grid_pos
+				grid_pos = Vector2(temp_pos[0]-1, temp_pos[1])
+				WallTiles.set_cell(grid_pos, 44, Vector2i(4,1))
+				
+				grid_pos = Vector2(temp_pos[0], temp_pos[1])
+				WallTiles.set_cell(grid_pos, 44, Vector2i(6,0))
+				
+				grid_pos = Vector2(temp_pos[0], temp_pos[1]+1)
+				WallTiles.set_cell(grid_pos, 44, Vector2i(6,1))
+				
+			#Add a corner
+			#find all cell that id
+			var all_floor_cells: Array[Vector2i] = WallTiles.get_used_cells_by_id(44, Vector2i(4,1))
+	
+			# You can now loop through this array directly
+			for cell in all_floor_cells:
+				var other_wall = WallTiles.get_cell_atlas_coords(Vector2i(cell[0]-1,cell[1]-1))
+				if other_wall == Vector2i(6,1):
+					WallTiles.set_cell(Vector2i(cell[0]-1,cell[1]), 44, Vector2i(2,2))
+	else:
+		push_warning("JSON loaded, but 'walls' keys were missing!")
 
-	floor_node.add_child(shadow)
-
-
-# === floor tiles ===
-# builds the base surface of the level using isometric diamonds
-func _build_floor() -> void:
-	if use_tilesheet_floor and floor_texture != null:
-		_build_floor_tiles()
+func _build_goal_cells(data: Dictionary, cols: int, rows: int) -> void:
+	if not data.has("goal"):
 		return
-
-	_build_floor_legacy()
-
-
-func _build_goal_cells() -> void:
-	if not level_data.has("goal"):
-		return
-	var goal = level_data["goal"]
+	var goal = data["goal"]
 	if goal.has("possible_final_positions"):
 		for pos in goal["possible_final_positions"]:
 			if typeof(pos) == TYPE_ARRAY and pos.size() >= 2:
-				goal_cells["%d,%d" % [int(pos[0]), int(pos[1])]] = true
+				var grid_pos = Vector2i((pos[0]) - 1, rows - (pos[1]))
+				print(grid_pos)
+				# Draw your floor tile (Assuming source_id 0 and atlas coords 0,0)
+				FloorTiles.set_cell(grid_pos, 8, Vector2i(0, 0))
 	if goal.has("position"):
 		var pos = goal["position"]
 		if typeof(pos) == TYPE_DICTIONARY:
-			goal_cells["%d,%d" % [int(pos.get("x", -1)), int(pos.get("y", -1))]] = true
+			var grid_pos = Vector2i((int(pos.get("x", -1)) - 1), rows - (int(pos.get("y", -1))))
+			print(grid_pos)
+			# Draw your floor tile (Assuming source_id 0 and atlas coords 0,0)
+			FloorTiles.set_cell(grid_pos, 8, Vector2i(0, 0))
 
+func _is_goal_tile(gx: int, gy: int) -> void:
+	pass
+	#return goal_cells.has("%d,%d" % [gx, gy])
 
-func _is_goal_tile(gx: int, gy: int) -> bool:
-	return goal_cells.has("%d,%d" % [gx, gy])
+## Define and places the player at starting position
+func _place_player(data: Dictionary, cols: int, rows: int) -> void:
+	if data.has("robots"):
 
+		var robots = level_data["robots"]
+		if robots.is_empty():
+			push_warning("JSON loaded, but 'robots' is empty!")
+		else:
+			# Determine the starting position given by the JSON
+			var robot_info = robots[0]
+			var innit_x: int = robot_info.get("x", 1)
+			var innit_y: int = robot_info.get("y", 1)
+			
+			if player_moved:
+				innit_x = player_x_pos
+				innit_y = player_y_pos
+			# Move to desired position
+			# CAUTION: mantain chunk_size since floor are scale 2x
+			cols = cols * chunk_size
+			rows = rows * chunk_size
+			var max_grid = max(cols,rows)
+			
+			innit_x = (innit_x * chunk_size) - 2
+			innit_y = (innit_y * chunk_size) - 2
+			
+			var pos_x = innit_x
+			var pos_y = rows - innit_y - 2
+			
+			if rotation_state == 1:
+				pos_x = innit_y
+				pos_y = innit_x
+			elif rotation_state == 2:
+				pos_x = max_grid - innit_x - 2
+				pos_y = innit_y
+			elif rotation_state == 3:
+				pos_x = max_grid - innit_y - 2
+				pos_y = max_grid - innit_x - 2
 
-func _build_floor_tiles() -> void:
-	var scale_x := float(tile_width) / float(floor_tile_pixel_size.x)
-	var scale_y := float(tile_height) / float(floor_tile_pixel_size.y)
+			# 5. Ask the TileMapLayer where that specific grid tile is in actual pixels
+			var grid_pos = FloorTiles.map_to_local(Vector2i(pos_x,pos_y))
+			# If offset is needed
+			@warning_ignore("narrowing_conversion")
+			var pixel_pos = Vector2i(grid_pos[0]+offset_x,grid_pos[1]+offset_y)
+			
+			# 6. Move the CharacterBody2D to those exact pixels!
+			print("Start Position: ", innit_x, ",", innit_y, " Grid Postion: ", grid_pos, " Pixel Position: ", pixel_pos)
+			player.initialize_from_level(robot_info, pixel_pos, player_moved)
+			#player.global_position = pixel_pos
 
-	for gx in range(1, cols + 1):
-		for gy in range(1, rows + 1):
-			var atlas := floor_primary_atlas
+## Centers the camera to the middle and zoom relative to the grid size.
+func _center_camera(cols: int, rows: int) -> void:
+	# 1. Find the 4 extreme corners of the isometric diamond grid
+	# (Subtracting 1 because a 6x6 grid goes from index 0 to 5)
+	var top_corner = FloorTiles.map_to_local(Vector2i(0, 0))
+	var bottom_corner = FloorTiles.map_to_local(Vector2i(cols - 1, rows - 1))
+	var right_corner = FloorTiles.map_to_local(Vector2i(cols - 1, 0))
+	var left_corner = FloorTiles.map_to_local(Vector2i(0, rows - 1))
 
-			if _is_goal_tile(gx, gy):
-				# render goal tile with a color overlay instead of atlas swap
-				_build_goal_tile_visual(gx, gy)
-				continue
-			elif floor_use_json_tiles and _is_json_marked_tile(gx, gy):
-				atlas = floor_json_marked_atlas
-			elif floor_use_checker_alt and (gx + gy) % 2 != 0:
-				atlas = floor_alt_atlas
+	# 2. Get the base pixel boundaries
+	var min_x = left_corner.x
+	var max_x = right_corner.x
+	var min_y = top_corner.y
+	var max_y = bottom_corner.y
 
-			var sprite := Sprite2D.new()
-			sprite.texture = floor_texture
-			sprite.region_enabled = true
-			sprite.region_rect = Rect2(
-				Vector2(atlas.x * floor_tile_pixel_size.x, atlas.y * floor_tile_pixel_size.y),
-				Vector2(floor_tile_pixel_size.x, floor_tile_pixel_size.y)
-			)
-			sprite.centered = true
-			sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			sprite.scale = Vector2(scale_x, scale_y)
-			sprite.position = _cell_center(gx, gy) + Vector2(0, floor_bottom_offset)
+	# 3. Add padding for the tile edges! 
+	# map_to_local() returns the CENTER of the tile. If we don't add half 
+	# of the tile's size, the camera will cut off the outer halves of the edge tiles.
+	var half_tile = Vector2(FloorTiles.tile_set.tile_size) / 2.0
+	min_x -= half_tile.x
+	max_x += half_tile.x
+	min_y -= half_tile.y
+	max_y += half_tile.y
 
-			floor_node.add_child(sprite)
+	# 4. Center the camera
+	var center_x = (min_x + max_x) / 2.0
+	var center_y = (min_y + max_y) / 2.0
+	
+	# Convert local coordinates back to global just in case the Node2D is moved
+	camera.global_position = FloorTiles.to_global(Vector2(center_x, center_y))
 
-
-func _build_goal_tile_visual(gx: int, gy: int) -> void:
-	var scale_x := float(tile_width) / float(floor_tile_pixel_size.x)
-	var scale_y := float(tile_height) / float(floor_tile_pixel_size.y)
-
-	# Base tile using primary atlas
-	var sprite := Sprite2D.new()
-	sprite.texture = floor_texture
-	sprite.region_enabled = true
-	sprite.region_rect = Rect2(
-		Vector2(floor_primary_atlas.x * floor_tile_pixel_size.x, floor_primary_atlas.y * floor_tile_pixel_size.y),
-		Vector2(floor_tile_pixel_size.x, floor_tile_pixel_size.y)
-	)
-	sprite.centered = true
-	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	sprite.scale = Vector2(scale_x, scale_y)
-	sprite.position = _cell_center(gx, gy) + Vector2(0, floor_bottom_offset)
-	floor_node.add_child(sprite)
-
-	# Yellow color overlay on top
-	var overlay := Polygon2D.new()
-	overlay.polygon = PackedVector2Array([
-		Vector2(0, -tile_height / 2.0),
-		Vector2(tile_width / 2.0, 0),
-		Vector2(0, tile_height / 2.0),
-		Vector2(-tile_width / 2.0, 0)
-	])
-	overlay.color = floor_goal_color
-	overlay.position = _cell_center(gx, gy) + Vector2(0, floor_bottom_offset)
-	overlay.z_index = 1
-	floor_node.add_child(overlay)
-
-
-func _is_json_marked_tile(gx: int, gy: int) -> bool:
-	if not level_data.has("tiles"):
-		return false
-
-	if typeof(level_data["tiles"]) != TYPE_DICTIONARY:
-		return false
-
-	var key := "%d,%d" % [gx, gy]
-	return level_data["tiles"].has(key)
-
-
-func _build_floor_legacy() -> void:
-	for gx in range(1, cols + 1):
-		for gy in range(1, rows + 1):
-			var tile := Polygon2D.new()
-
-			tile.polygon = PackedVector2Array([
-				Vector2(0, -tile_height / 2.0),
-				Vector2(tile_width / 2.0, 0),
-				Vector2(0, tile_height / 2.0),
-				Vector2(-tile_width / 2.0, 0)
-			])
-
-			# alternating colors so the board doesn't look dead
-			tile.color = floor_color if (gx + gy) % 2 == 0 else floor_color_alt
-			tile.position = _cell_center(gx, gy)
-
-			floor_node.add_child(tile)
-
+	# Hardcode the zoom depending on the grid size
+	# - Determine the zoom size byt an incresing grid interval of 5
+	# - The starting zoom is 0.5
+	# - The max zoom is 0.1
+	var max_grid_size = max(cols, rows)
+	
+	# Determine on what interval of 5 we are on
+	@warning_ignore("integer_division")
+	var step = (int(max_grid_size) - 1) / 5
+	
+	# Determine a proper zoom between grid sizes
+	var final_zoom = 1
+	print("Grid Size Level: ", step)
+	if step < 5:
+		final_zoom = 0.15 - (step * 0.03)
+	else:
+		final_zoom = 0.1 - (step * 0.01)
+	
+	# CRITICAL: Put a floor. Camera zoom cannot be 0
+	final_zoom = max(final_zoom, 0.01) 
+	
+	# Apply the zoom
+	# # CRITICAL: Since this camera zoom is fixed recomend no bigger than 35X35 grid size
+	camera.zoom = Vector2(final_zoom, final_zoom)
 
 # === grid overlay ===
 # visual helper for readability and debugging (not gameplay logic)
-func _build_grid() -> void:
-	for gx in range(1, cols + 1):
-		for gy in range(1, rows + 1):
-			var diamond := Line2D.new()
-			diamond.width = 1.0
-			diamond.default_color = grid_color
+#func _build_grid() -> void:
+	#for gx in range(1, cols + 1):
+		#for gy in range(1, rows + 1):
+			#var diamond := Line2D.new()
+			#diamond.width = 1.0
+			#diamond.default_color = grid_color
+#
+			#var c := _cell_center(gx, gy)
+			#var top := c + Vector2(0, -tile_height / 2.0)
+			#var right := c + Vector2(tile_width / 2.0, 0)
+			#var bottom := c + Vector2(0, tile_height / 2.0)
+			#var left := c + Vector2(-tile_width / 2.0, 0)
+#
+			#diamond.add_point(top)
+			#diamond.add_point(right)
+			#diamond.add_point(bottom)
+			#diamond.add_point(left)
+			#diamond.add_point(top)
+#
+			#grid_node.add_child(diamond)
 
-			var c := _cell_center(gx, gy)
-			var top := c + Vector2(0, -tile_height / 2.0)
-			var right := c + Vector2(tile_width / 2.0, 0)
-			var bottom := c + Vector2(0, tile_height / 2.0)
-			var left := c + Vector2(-tile_width / 2.0, 0)
+# ======= public helpers =======
 
-			diamond.add_point(top)
-			diamond.add_point(right)
-			diamond.add_point(bottom)
-			diamond.add_point(left)
-			diamond.add_point(top)
+## Returns the proper position in realation to the floor grids.
+## Input:  New grid position
+## Output: Pixel position in relation to the grid position
+func grid_position(x_pos: int, y_pos: int) -> Vector2:
+	# Remember if the player has moved
+	player_moved = true
+	player_x_pos = x_pos
+	player_y_pos = y_pos
+	
+	var cols = world_x_size * chunk_size
+	var rows = world_y_size * chunk_size
+	var max_grid = max(cols,rows)
+	
+	x_pos = (x_pos * chunk_size) - 2
+	y_pos = (y_pos * chunk_size) - 2
+	
+	var pos_x = x_pos
+	var pos_y = rows - y_pos - 2
+	
+	if rotation_state == 1:
+		pos_x = y_pos
+		pos_y = x_pos
+	elif rotation_state == 2:
+		pos_x = max_grid - x_pos - 2
+		pos_y = y_pos
+	elif rotation_state == 3:
+		pos_x = max_grid - y_pos - 2
+		pos_y = max_grid - x_pos - 2
 
-			grid_node.add_child(diamond)
+	# 5. Ask the TileMapLayer where that specific grid tile is in actual pixels
+	var grid_pos = FloorTiles.map_to_local(Vector2i(pos_x,pos_y))
 
+	# If offset is needed
+	@warning_ignore("narrowing_conversion")
+	var pixel_pos = Vector2i(grid_pos[0]+offset_x,grid_pos[1]+offset_y)
+	print("New Position: ", x_pos, ",", y_pos, " Grid Postion: ", grid_pos, " Pixel Position: ", pixel_pos)
+	return pixel_pos
 
-# === player placement ===
-# decides WHERE the player goes
-# the player script decides how it behaves and looks
-func _place_player() -> void:
-	if not level_data.has("robots"):
-		return
-
-	var robots = level_data["robots"]
-	if robots.is_empty():
-		return
-
-	var robot = robots[0]
-	var gx: int = robot.get("x", 1)
-	var gy: int = robot.get("y", 1)
-	var world_pos := _cell_center(gx, gy)
-
-	# pass this level_scene into the player so it can query bounds and positions cleanly
-	if player.has_method("initialize_from_level"):
-		player.initialize_from_level(robot, world_pos)
-
-
-# === walls ===
-# reads wall data and draws directional wall segments
-func _build_walls() -> void:
-	if not level_data.has("walls"):
-		return
-
-	for key in level_data["walls"].keys():
-		var parts: PackedStringArray = key.split(",")
-		if parts.size() != 2:
-			continue
-
-		var gx := int(parts[0])
-		var gy := int(parts[1])
-		var directions = level_data["walls"][key]
-
-		for dir in directions:
-			_add_wall_segment(gx, gy, dir)
-
-
-func _add_wall_segment(gx: int, gy: int, dir: String) -> void:
-	if use_tilesheet_walls and wall_north_atlas != null and wall_east_atlas != null:
-		_add_wall_segment_tiles(gx, gy, dir)
-		return
-	_add_wall_segment_legacy(gx, gy, dir)
-
-
-func _add_wall_segment_tiles(gx: int, gy: int, dir: String) -> void:
-	var c := _cell_center(gx, gy)
-
-	var top := c + Vector2(0, -tile_height / 2.0)
-	var right := c + Vector2(tile_width / 2.0, 0)
-	var bottom := c + Vector2(0, tile_height / 2.0)
-	var left := c + Vector2(-tile_width / 2.0, 0)
-
-	var start := Vector2.ZERO
-	var end := Vector2.ZERO
-	var tex: Texture2D
-
-	match dir:
-		"north":
-			start = top
-			end = right
-			tex = wall_north_atlas
-		"east":
-			start = right
-			end = bottom
-			tex = wall_east_atlas
-		"south":
-			start = bottom
-			end = left
-			tex = wall_north_atlas
-		"west":
-			start = left
-			end = top
-			tex = wall_east_atlas
-		_:
-			return
-
-	if tex == null:
-		return
-
-	# use cached trim to avoid re-scanning pixels on every wall
-	var tex_path := tex.resource_path
-	var region: Rect2
-	if _wall_trim_cache.has(tex_path):
-		region = _wall_trim_cache[tex_path]
-	else:
-		var image := tex.get_image()
-		var min_x := image.get_width()
-		var max_x := -1
-		var min_y := image.get_height()
-		var max_y := -1
-		for y in range(image.get_height()):
-			for x in range(image.get_width()):
-				if image.get_pixel(x, y).a > 0.01:
-					if x < min_x:
-						min_x = x
-					if y < min_y:
-						min_y = y
-					if x > max_x:
-						max_x = x
-					if y > max_y:
-						max_y = y
-		if max_x < 0:
-			return
-		region = Rect2(Vector2(min_x, min_y), Vector2(max_x - min_x + 1, max_y - min_y + 1))
-		_wall_trim_cache[tex_path] = region
-
-	var edge_len := (end - start).length()
-	var anchor := (start + end) * 0.5
-	var scale_x := edge_len / region.size.x
-	var scale_y := scale_x
-	var scaled_h := region.size.y * scale_y
-
-	var sprite := Sprite2D.new()
-	sprite.texture = tex
-	sprite.region_enabled = true
-	sprite.region_rect = region
-	sprite.centered = true
-	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	sprite.scale = Vector2(scale_x, scale_y)
-	sprite.position = anchor + Vector2(0, -scaled_h * 0.5) + wall_position_offset
-	walls_node.add_child(sprite)
-
-
-func _add_wall_segment_legacy(gx: int, gy: int, dir: String) -> void:
-	var c := _cell_center(gx, gy)
-
-	var top := c + Vector2(0, -tile_height / 2.0)
-	var right := c + Vector2(tile_width / 2.0, 0)
-	var bottom := c + Vector2(0, tile_height / 2.0)
-	var left := c + Vector2(-tile_width / 2.0, 0)
-
-	var wall := Line2D.new()
-	wall.width = 5.0
-	wall.default_color = wall_color
-
-	match dir:
-		"north":
-			wall.add_point(top)
-			wall.add_point(right)
-		"east":
-			wall.add_point(right)
-			wall.add_point(bottom)
-		"south":
-			wall.add_point(bottom)
-			wall.add_point(left)
-		"west":
-			wall.add_point(left)
-			wall.add_point(top)
-		_:
-			return
-
-	walls_node.add_child(wall)
-
-
-# === camera framing ===
-# centers and zooms the camera so the entire board fits on screen
-func _center_camera() -> void:
-	camera.enabled = true
-	camera.make_current()
-
-	var top := _cell_center(1, rows)
-	var bottom := _cell_center(cols, 1)
-	var left := _cell_center(cols, rows)
-	var right := _cell_center(1, 1)
-
-	var min_x = min(top.x, bottom.x, left.x, right.x)
-	var max_x = max(top.x, bottom.x, left.x, right.x)
-	var min_y = min(top.y, bottom.y, left.y, right.y)
-	var max_y = max(top.y, bottom.y, left.y, right.y)
-
-	var world_width = max_x - min_x
-	var world_height = max_y - min_y
-
-	camera.position = Vector2(
-		min_x + world_width / 2.0,
-		min_y + world_height / 2.0
-	)
-
-	var viewport_size := get_viewport_rect().size
-	if viewport_size.x <= 0 or viewport_size.y <= 0:
-		camera.zoom = Vector2.ONE
-		return
-
-	var zoom_x = viewport_size.x / world_width
-	var zoom_y = viewport_size.y / world_height
-	var fit_zoom = min(zoom_x, zoom_y) * 0.85
-
-	camera.zoom = Vector2(fit_zoom, fit_zoom)
-
-
-# === coordinate system ===
-# converts grid coordinates into isometric world positions
-func _cell_center(gx: int, gy: int) -> Vector2:
-	var grid_x := float(gx - 1)
-	var grid_y := float(rows - gy)
-
-	var iso_x := (grid_x - grid_y) * (tile_width / 2.0)
-	var iso_y := (grid_x + grid_y) * (tile_height / 2.0)
-
-	var offset_x := cols * tile_width * 0.5
-	var offset_y := tile_height * 1.5
-
-	return Vector2(iso_x + offset_x, iso_y + offset_y)
-
-
-# === helpers ===
-# removes all children from a node (used for rebuilding levels)
-func _clear_children(node: Node) -> void:
-	for child in node.get_children():
-		child.queue_free()
-
-
-# === public helpers ===
-# these are used by runtime systems like the player
-
-# converts grid coordinates into world space position
-func grid_to_world_position(gx: int, gy: int) -> Vector2:
-	return _cell_center(gx, gy)
-
-# simple bounds check so the player doesn't walk off the map like a clown
+## simple bounds check so the player doesn't walk off the map like a clown
 func is_in_bounds(gx: int, gy: int) -> bool:
-	return gx >= 1 and gx <= cols and gy >= 1 and gy <= rows
+	return gx >= 1 and gx <= world_x_size and gy >= 1 and gy <= world_y_size
 
-
+## Not so simple bound check so the player doesn't go through walls
 func is_move_blocked(gx: int, gy: int, dir: String) -> bool:
-	if not is_in_bounds(gx, gy):
-		return true
-	if tile_has_any_object(gx, gy):
-		return true
-
-	var nx := gx
-	var ny := gy
-	match dir:
-		"east":
-			nx += 1
-		"west":
-			nx -= 1
-		"north":
-			ny += 1
-		"south":
-			ny -= 1
-		_:
-			return true
-
-	var exit_wall := ""
-	var entry_wall := ""
-	match dir:
-		"east":
-			exit_wall = "east"
-			entry_wall = "west"
-		"west":
-			exit_wall = "west"
-			entry_wall = "east"
-		"north":
-			exit_wall = "north"
-			entry_wall = "south"
-		"south":
-			exit_wall = "south"
-			entry_wall = "north"
-
-	if not is_in_bounds(nx, ny):
-		return true
-
-	# Edge-wall mode fallback: blocked by wall edge on current cell.
-	if _cell_has_wall_edge(gx, gy, exit_wall):
-		return true
-
-	return _cell_has_wall_edge(nx, ny, entry_wall)
+	# Check if wall even exist
+	if level_data.has("walls"):
+		# Check the a wall withing a given cell
+		var key := "%d,%d" % [gx, gy]
+		print(key)
+		if level_data["walls"].has(key):
+			# Find if at least one wall face the player
+			var direction = level_data["walls"][key]
+			for d in direction:
+				if str(d).to_lower() == dir:
+					return true
+	return false
 
 
 func _cell_key(gx: int, gy: int) -> String:
 	return "%d,%d" % [gx, gy]
 
-
-func _cell_has_wall_edge(gx: int, gy: int, dir: String) -> bool:
-	if not level_data.has("walls"):
-		return false
-
-	if typeof(level_data["walls"]) != TYPE_DICTIONARY:
-		return false
-
-	var key := "%d,%d" % [gx, gy]
-	if not level_data["walls"].has(key):
-		return false
-
-	var directions = level_data["walls"][key]
-	if typeof(directions) != TYPE_ARRAY:
-		return false
-
-	for d in directions:
-		if str(d).to_lower() == dir:
-			return true
-
+## Check is there any wall facing the player
+## Input: current position and direction
+## Output: True(player face wall), False(player does not face wall)
+func _check_wall(gx: int, gy: int, dir: String) -> bool:
+	# Check if wall even exist
+	if level_data.has("walls"):
+		# Check the a wall withing a given cell
+		var key := "%d,%d" % [gx, gy]
+		if level_data["walls"].has(key):
+			# Find if at least one wall face the player
+			var direction = level_data["walls"][key]
+			for d in direction:
+				if str(d).to_lower() == dir:
+					return true
 	return false
 
 
@@ -592,10 +462,14 @@ func check_win_condition(gx: int, gy: int) -> void:
 
 # === objects ===
 # render objects as small colored diamonds for now
+func _clear_children(node: Node) -> void:
+	for child in node.get_children():
+		child.queue_free()
+
 func _build_objects() -> void:
 	_clear_children(objects_node)
 
-	for key in objects.keys():
+	for key in object_data.keys():
 		var parts = key.split(",")
 		if parts.size() != 2:
 			continue
@@ -603,31 +477,32 @@ func _build_objects() -> void:
 		var gx := int(parts[0])
 		var gy := int(parts[1])
 
-		var tile_objects: Dictionary = objects[key]
+		var tile_objects: Dictionary = object_data[key]
 
 		for object_name in tile_objects.keys():
 			var count := int(tile_objects[object_name])
 
 			for i in range(count):
+				print(object_name, ", ", gx, ", ", gy, ", ", i)
 				_spawn_object(object_name, gx, gy, i)
-
 
 func _spawn_object(object_name: String, gx: int, gy: int, index: int) -> void:
 	var marker := Polygon2D.new()
 
 	marker.polygon = PackedVector2Array([
-		Vector2(0, -8),
-		Vector2(8, 0),
-		Vector2(0, 8),
-		Vector2(-8, 0)
+		Vector2(0, -64),
+		Vector2(64, 0),
+		Vector2(0, 64),
+		Vector2(-64, 0)
 	])
 
 	marker.color = _get_object_color(object_name)
-	marker.position = _cell_center(gx, gy) + Vector2(0, -6 - 8 * index)
-	marker.z_index = 1
+	var grid_pos = grid_position(gx, gy+1)
+	marker.position = Vector2i(grid_pos[0] + offset_x, grid_pos[1] + offset_y)
+	marker.z_index = 0
+	marker.y_sort_enabled = true
 
 	objects_node.add_child(marker)
-
 
 func _get_object_color(object_name: String) -> Color:
 	match object_name:
@@ -644,18 +519,16 @@ func _get_object_color(object_name: String) -> Color:
 		_:
 			return Color(1.0, 1.0, 1.0)
 
-
 func get_objects_at(gx: int, gy: int) -> Dictionary:
-	return objects.get(_cell_key(gx, gy), {})
-
+	return object_data.get(_cell_key(gx, gy), {})
 
 func remove_object_at(gx: int, gy: int) -> String:
 	var key := _cell_key(gx, gy)
 
-	if not objects.has(key):
+	if not object_data.has(key):
 		return ""
 
-	var tile_objects: Dictionary = objects[key]
+	var tile_objects: Dictionary = object_data[key]
 
 	for object_name in tile_objects.keys():
 		tile_objects[object_name] -= 1
@@ -664,13 +537,12 @@ func remove_object_at(gx: int, gy: int) -> String:
 			tile_objects.erase(object_name)
 
 		if tile_objects.is_empty():
-			objects.erase(key)
+			object_data.erase(key)
 
 		_build_objects()
 		return object_name
 
 	return ""
-
 
 func place_object_at(gx: int, gy: int, object_name: String) -> void:
 	if object_name == "":
@@ -678,15 +550,15 @@ func place_object_at(gx: int, gy: int, object_name: String) -> void:
 
 	var key := _cell_key(gx, gy)
 
-	if not objects.has(key):
-		objects[key] = {}
+	if not object_data.has(key):
+		object_data[key] = {}
 
-	if not objects[key].has(object_name):
-		objects[key][object_name] = 0
+	if not object_data[key].has(object_name):
+		object_data[key][object_name] = 0
 
-	objects[key][object_name] += 1
+	object_data[key][object_name] += 1
 	_build_objects()
-	
+
 func handle_player_enter_tile(gx: int, gy: int, player) -> void:
 	var tile_objects: Dictionary = get_objects_at(gx, gy)
 
@@ -700,8 +572,7 @@ func handle_player_enter_tile(gx: int, gy: int, player) -> void:
 				pass
 			_:
 				pass
-				
-				
+
 func handle_pick_attempt(gx: int, gy: int, player) -> bool:
 	var tile_objects: Dictionary = get_objects_at(gx, gy)
 
@@ -713,7 +584,7 @@ func handle_pick_attempt(gx: int, gy: int, player) -> bool:
 			return false  # blocked
 
 	return true  # otherwise allowed
-	
+
 func handle_place_attempt(gx: int, gy: int, object_name: String, player) -> bool:
 	# return false if placing should be blocked
 	match object_name:
@@ -723,7 +594,7 @@ func handle_place_attempt(gx: int, gy: int, object_name: String, player) -> bool
 			return true
 		_:
 			return true
-			
+
 func tile_has_any_object(gx: int, gy: int) -> bool:
 	var tile_objects: Dictionary = get_objects_at(gx, gy)
 	return not tile_objects.is_empty()
