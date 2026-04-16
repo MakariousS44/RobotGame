@@ -45,6 +45,7 @@ signal level_complete
 @onready var camera: Camera2D = $Camera2D
 
 
+
 # === loaded level state ===
 # this is already-usable level data, not raw JSON
 var level_data: Dictionary = {}
@@ -499,6 +500,8 @@ func is_in_bounds(gx: int, gy: int) -> bool:
 func is_move_blocked(gx: int, gy: int, dir: String) -> bool:
 	if not is_in_bounds(gx, gy):
 		return true
+	if tile_has_any_object(gx, gy):
+		return true
 
 	var nx := gx
 	var ny := gy
@@ -683,3 +686,44 @@ func place_object_at(gx: int, gy: int, object_name: String) -> void:
 
 	objects[key][object_name] += 1
 	_build_objects()
+	
+func handle_player_enter_tile(gx: int, gy: int, player) -> void:
+	var tile_objects: Dictionary = get_objects_at(gx, gy)
+
+	for object_name in tile_objects.keys():
+		match object_name:
+			"spike":
+				if player.has_method("_trigger_lose"):
+					player._trigger_lose("You lose: stepped on spikes.")
+			"banana":
+				# probably nothing on enter
+				pass
+			_:
+				pass
+				
+				
+func handle_pick_attempt(gx: int, gy: int, player) -> bool:
+	var tile_objects: Dictionary = get_objects_at(gx, gy)
+
+	if tile_objects.is_empty():
+		return false  # nothing to pick
+
+	for object_name in tile_objects.keys():
+		if object_name == "rock":
+			return false  # blocked
+
+	return true  # otherwise allowed
+	
+func handle_place_attempt(gx: int, gy: int, object_name: String, player) -> bool:
+	# return false if placing should be blocked
+	match object_name:
+		"banana":
+			return true
+		"apple":
+			return true
+		_:
+			return true
+			
+func tile_has_any_object(gx: int, gy: int) -> bool:
+	var tile_objects: Dictionary = get_objects_at(gx, gy)
+	return not tile_objects.is_empty()
