@@ -2,21 +2,6 @@ extends Node2D
 
 signal level_complete
 
-
-# === visual config ===
-# tweakables so we're not hardcoding mystery numbers all over the place
-@export var tile_width: int = 64
-@export var tile_height: int = 32
-
-@export var use_tilesheet_floor: bool = true
-@export var use_tilesheet_walls: bool = true
-
-
-@export var grid_color: Color = Color("d0d5c8")
-@export var show_grid_overlay: bool = true
-@export var wall_color: Color = Color(1, 0, 0, 1)
-@export var board_shadow_color: Color = Color(0, 0, 0, 0.14)
-
 # === scene references ===
 # all the visual level layers live under WorldRoot
 @onready var world_root: Node2D = $WorldRoot
