@@ -486,3 +486,19 @@ func log_warning(text: String) -> void:
 
 func log_error(text: String) -> void:
 	output_box.append_text("[color=#e17777]✗[/color]  %s\n" % text)
+
+# Function Signal
+
+## Trigger a redraw of the map
+##
+## Rotate right
+func r_rotate_button_up() -> void:
+	# Utilize Global events to communicate to the level scene
+	EventManager.rotate_camera_right.emit()
+
+## Trigger a redraw of the map
+##
+## Rotate right
+func l_rotate_button_up() -> void:
+	# Utilize Global events to communicate to the level scene
+	EventManager.rotate_camera_left.emit()

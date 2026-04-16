@@ -32,14 +32,16 @@ const chunk_size = 2
 var level_data: Dictionary = {}
 var world_x_size : int = 10
 var world_y_size : int = 10
+var player_x_pos : int = 0
+var player_y_pos : int = 0
+var rotation_state = 0
+var offset_x = 256
+var offset_y = 64
+var player_moved = false
 
-# === scene lifecycle ===
-# runs when this scene is instantiated into the tree
-# this scene owns the camera, so it configures it here
 func _ready() -> void:
-	camera.enabled = true
-	camera.make_current()
-
+	EventManager.rotate_camera_left.connect(rotate_world_left)
+	EventManager.rotate_camera_right.connect(rotate_world_right)
 
 # ======= MAIN POINT: Build Rendition =======
 ## Builds a world given that JSON data (format: Reborg)
@@ -75,13 +77,73 @@ func build_level(data: Dictionary) -> void:
 	else:
 		push_warning("JSON loaded, but 'cols' or 'rows' keys were missing!")
 
+## Just signal rotation state to the right and calls for redraw
+func rotate_world_right():
+	rotation_state -=1
+	if rotation_state == -1:
+		rotation_state = 3
+	_rotate_world()
+
+## Just signal rotation state to the left and calls for redraw
+func rotate_world_left():
+	rotation_state +=1
+	if rotation_state == 4:
+		rotation_state = 0
+	_rotate_world()
+
+## Rebuild the wolrd given a new rotation state
+func _rotate_world():
+	var data = level_data
+	
+	# Generate the Floor Grid
+	if data.has("cols") and data.has("rows"):
+		# Given the rotation step are cols and rows swap
+		var cols = int(data["cols"])
+		var rows = int(data["rows"])
+		
+		print(rotation_state)
+
+		world_x_size = cols
+		world_y_size = rows
+		print("Floor: ", cols,"x",rows)
+		
+		# Create the floor
+		_build_floor(cols, rows)
+		# Create the wall
+		#_build_walls(data, cols, rows)
+		# Create the player
+		_place_player(data, cols, rows)
+		# Place goals
+		#_build_goal_cells(data, cols, rows)
+		# Set the camera
+		#_center_camera(cols, rows)
+	else:
+		push_warning("JSON loaded, but 'cols' or 'rows' keys were missing!")
+
 # ====== World Rendering Functions ======
 ## This builds the floor given the grid size
 func _build_floor(cols: int,rows: int) -> void:
+	# Clear current floor
+	FloorTiles.clear()
 	# Loop through every x (column) and y (row) to fill the grid
+	var max_grid = max(cols,rows)
+	
 	for x in range(cols):
+		var draw_x = x
 		for y in range(rows):
-			var grid_pos = Vector2i(x, y)
+			var draw_y = y
+				# Swap the coordinates based on the current angle!
+			if rotation_state == 1: # 90 Degrees
+				draw_x = y
+				draw_y = x
+			elif rotation_state == 2: # 180 Degrees
+				draw_x = (max_grid - 1) - x
+				draw_y = (max_grid - 1) - y
+			elif rotation_state == 3: # 270 Degrees
+				draw_x = (max_grid - 1) - y
+				draw_y = (max_grid - 1) - x
+			
+			var grid_pos = Vector2i(draw_x,draw_y)
 			# Draw your floor tile (Assuming source_id 0 and atlas coords 0,0)
 			FloorTiles.set_cell(grid_pos, 8, Vector2i(0, 1))
 
@@ -186,20 +248,41 @@ func _place_player(data: Dictionary, cols: int, rows: int) -> void:
 			var robot_info = robots[0]
 			var innit_x: int = robot_info.get("x", 1)
 			var innit_y: int = robot_info.get("y", 1)
+			
+			if player_moved:
+				innit_x = player_x_pos
+				innit_y = player_y_pos
 			# Move to desired position
 			# CAUTION: mantain chunk_size since floor are scale 2x
-			var center_physical_x = ((cols * chunk_size) - (((cols * chunk_size)+2) - innit_x * chunk_size))
-			var center_physical_y = ((rows * chunk_size) - (innit_y * chunk_size) + 2)
+			cols = cols * chunk_size
+			rows = rows * chunk_size
+			var max_grid = max(cols,rows)
 			
+			innit_x = (innit_x * chunk_size) - 2
+			innit_y = (innit_y * chunk_size) - 2
+			
+			var pos_x = innit_x
+			var pos_y = rows - innit_y - 2
+			
+			if rotation_state == 1:
+				pos_x = innit_y
+				pos_y = innit_x
+			elif rotation_state == 2:
+				pos_x = max_grid - innit_x - 2
+				pos_y = innit_y
+			elif rotation_state == 3:
+				pos_x = max_grid - innit_y - 2
+				pos_y = max_grid - innit_x - 2
+
 			# 5. Ask the TileMapLayer where that specific grid tile is in actual pixels
-			var grid_pos = FloorTiles.map_to_local(Vector2i(center_physical_x, center_physical_y))
+			var grid_pos = FloorTiles.map_to_local(Vector2i(pos_x,pos_y))
 			# If offset is needed
 			@warning_ignore("narrowing_conversion")
-			var pixel_pos = Vector2i(grid_pos[0],grid_pos[1])
+			var pixel_pos = Vector2i(grid_pos[0]+offset_x,grid_pos[1]+offset_y)
 			
 			# 6. Move the CharacterBody2D to those exact pixels!
 			print("Start Position: ", innit_x, ",", innit_y, " Grid Postion: ", grid_pos, " Pixel Position: ", pixel_pos)
-			player.initialize_from_level(robot_info, pixel_pos)
+			player.initialize_from_level(robot_info, pixel_pos, player_moved)
 			#player.global_position = pixel_pos
 
 ## Centers the camera to the middle and zoom relative to the grid size.
@@ -287,16 +370,37 @@ func _center_camera(cols: int, rows: int) -> void:
 ## Input:  New grid position
 ## Output: Pixel position in relation to the grid position
 func grid_position(x_pos: int, y_pos: int) -> Vector2:
-	# Move to desired position
-	# CAUTION: mantain chunk_size since floor are scale 2x
-	var center_physical_x = ((world_x_size * chunk_size) - (((world_x_size * chunk_size)+2) - x_pos * chunk_size))
-	var center_physical_y = ((world_y_size * chunk_size) - (y_pos * chunk_size) + 2)
+	# Remember if the player has moved
+	player_moved = true
+	player_x_pos = x_pos
+	player_y_pos = y_pos
+	
+	var cols = world_x_size * chunk_size
+	var rows = world_y_size * chunk_size
+	var max_grid = max(cols,rows)
+	
+	x_pos = (x_pos * chunk_size) - 2
+	y_pos = (y_pos * chunk_size) - 2
+	
+	var pos_x = x_pos
+	var pos_y = rows - y_pos - 2
+	
+	if rotation_state == 1:
+		pos_x = y_pos
+		pos_y = x_pos
+	elif rotation_state == 2:
+		pos_x = max_grid - x_pos - 2
+		pos_y = y_pos
+	elif rotation_state == 3:
+		pos_x = max_grid - y_pos - 2
+		pos_y = max_grid - x_pos - 2
 
 	# 5. Ask the TileMapLayer where that specific grid tile is in actual pixels
-	var grid_pos = FloorTiles.map_to_local(Vector2i(center_physical_x, center_physical_y))
+	var grid_pos = FloorTiles.map_to_local(Vector2i(pos_x,pos_y))
+
 	# If offset is needed
 	@warning_ignore("narrowing_conversion")
-	var pixel_pos = Vector2i(grid_pos[0],grid_pos[1]-25)
+	var pixel_pos = Vector2i(grid_pos[0]+offset_x,grid_pos[1]+offset_y)
 	print("New Position: ", x_pos, ",", y_pos, " Grid Postion: ", grid_pos, " Pixel Position: ", pixel_pos)
 	return pixel_pos
 

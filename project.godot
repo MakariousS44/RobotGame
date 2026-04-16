@@ -10,12 +10,16 @@ config_version=5
 
 [application]
 
-config/name="buildup"
+config/name="Code and Conquer"
 run/main_scene="uid://ddheufqb82bcu"
 config/features=PackedStringArray("4.6", "Forward Plus")
 boot_splash/bg_color=Color(0.97055286, 0.75035083, 0.88283765, 1)
 boot_splash/stretch_mode=0
 config/icon="res://assets/icon.svg"
+
+[autoload]
+
+EventManager="*uid://cl00riv6kfaao"
 
 [display]
 
